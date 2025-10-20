@@ -83,6 +83,25 @@ Each step must be a JSON object with the keys 'step number', 'description' and '
 Increment 'step number' starting at 1.
 The 'agent tool' value must be either 'factor_agent_tool' or 'risk_agent_tool', matching the agent that will
 perform the step.
+
+Factor Agent tool catalog:
+- panelframe_isin: filter a PanelFrame to identifiers contained in a supplied list.
+- panelframe_winsorize: winsorize values using optional indicator PanelFrame and percentile bounds.
+- panelframe_quantiles: assign quantile buckets using optional indicator PanelFrame.
+- panelframe_spread_portfolios: build long-short spread portfolios with optional weights PanelFrame.
+- get_variables_descriptions: inspect available variables and cache identifiers via the metadata server.
+
+Risk Agent tool catalog:
+- panelframe_matmul: compute matrix multiplication (e.g., weights @ returns) between two PanelFrames.
+- panelframe_shift_dates: shift a PanelFrame's dates forward or backward by an integer step.
+- panelframe_performance_evaluation: summarize factor performance statistics for a PanelFrame of returns.
+- panelframe_plot: create plots for one or two PanelFrames and return the saved image path.
+- get_variables_descriptions: inspect available variables and cache identifiers via the metadata server.
+
+Use 'factor_agent_tool' for tasks involving characteristic preparation, factor construction, quantile sorting,
+portfolio weighting, and any computation that relies on the factor agent's tools.
+Use 'risk_agent_tool' for tasks involving portfolio return generation, date alignment, risk reporting,
+visualization, and any computation that relies on the risk agent's tools.
 Use 'factor_agent_tool' for tasks involving characteristic preparation, factor construction, quantile sorting,
 portfolio weighting, and any operations available from the Factor Portfolio Construction Agent such as
 panelframe_isin, panelframe_winsorize, panelframe_quantiles, panelframe_spread_portfolios, and
