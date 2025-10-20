@@ -50,23 +50,47 @@ risk_server = MCPServerStreamableHTTP(url="http://localhost:8001/mcp")
 # Create the Manager Agent with its own set of tools
 manager_agent = Agent(
     name="Research Manager Agent",
-    model=model, 
+    model=model,
     system_prompt="""
 You are a Research Manager Agent overseeing quantitative research tasks.
-You have access to two specialized agents: a Factor Portfolio Construction Agent
-and a Risk Agent.
-Based on the user's requests or a plan of steps, you must decide which agent is best suited
-to handle each step, and delegate each step to that agent using the appropriate tool.
+You must first call the planner_agent_tool to request a step-by-step plan for the user's latest query.
+After receiving the JSON plan, decide which specialized agent should execute each step and delegate using
+the appropriate tool.
 Do not perform any data analysis or factor construction yourself.
 Do not use or assume use any data, characteristics or definitions that
 you were not given or you did not generate.
 Use `factor_agent_tool` for loading stock characteristics and constructing factor portfolio weights.
-Use `risk_agent_tool` for constructing factor portfolio returns, and evaluating performance and risk of 
+Use `risk_agent_tool` for constructing factor portfolio returns, and evaluating performance and risk of
 factor and portfolio returns.
-You may use the get_variables_descriptions tool to look for PanelFrame ids of stocks data. 
-Explain the steps you took and the agent tools you used for each step.
+You may use the get_variables_descriptions tool to look for PanelFrame ids of stocks data.
+Explain the steps you took, the planner output you received, and the agent tools you used for each step.
 """.strip(),
     model_settings={'temperature': 0.0}  # 0.1
+)
+
+planner_agent = Agent(
+    name="Research Planner Agent",
+    model=model,
+    system_prompt="""
+You are a planning specialist who designs execution plans for quantitative research requests.
+Review the full conversation and produce a JSON array of ordered steps.
+Each step must be a JSON object with the keys 'step number', 'description', 'agent tool', and 'computation'.
+Increment 'step number' starting at 1.
+The 'agent tool' value must be either 'factor_agent_tool' or 'risk_agent_tool', matching the agent that will
+execute the computation.
+Use 'factor_agent_tool' for tasks involving characteristic preparation, factor construction, quantile sorting,
+portfolio weighting, and any operations available from the Factor Portfolio Construction Agent such as
+panelframe_isin, panelframe_winsorize, panelframe_quantiles, panelframe_spread_portfolios, and
+get_variables_descriptions.
+Use 'risk_agent_tool' for tasks involving portfolio return generation, matrix operations like panelframe_matmul,
+date alignment with panelframe_shift_dates, performance evaluation via panelframe_performance_evaluation,
+plotting with panelframe_plot, and access to get_variables_descriptions.
+Describe the computation field with enough detail for the executing agent to know which tool call and
+parameters are needed.
+If no steps are required, return an empty JSON array.
+Do not delegate any tasks yourself and do not invoke external tools.
+""".strip(),
+    model_settings={'temperature': 0.0}
 )
 
 # Create the agent and attach MCP server
@@ -128,6 +152,18 @@ async def factor_agent_tool(ctx: RunContext, query: str) -> str:
     out = response.output if hasattr(response, "output") else str(response)
     st.session_state.messages.append({"role": "Factor Agent", "content": f"{out}"})
     return out  # << return TEXT
+
+
+@manager_agent.tool
+async def planner_agent_tool(ctx: RunContext, query: str) -> str:
+    """Tool to request a structured execution plan from the Planner Agent."""
+    full_query = build_conversation_context()
+    if query:
+        full_query = f"{full_query}\n\nManager instructions: {query}"
+    response = await planner_agent.run(full_query)
+    out = response.output if hasattr(response, "output") else str(response)
+    st.session_state.messages.append({"role": "Planner Agent", "content": f"{out}"})
+    return out
 
 # Streamlit app title
 st.title("💬 Quant Research Agents")
