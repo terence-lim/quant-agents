@@ -43,7 +43,7 @@ import json
 from qrafti import PanelFrame
 p1, p2 = PanelFrame('{panel_id}', **{dates}), PanelFrame('{other_panel_id}', **{dates})
 p3 = (p1 @ p2).persist()
-print(json.dumps({{'result_panel_id': p3.name}}))
+print(json.dumps({{'result_panel_id': p3.name, 'metadata': p3.info}}))
 """
     log_message(f"\\nExecuting code for panelframe_matmul:\\n{code}\\n")
     return execute_in_sandbox(code)
@@ -77,7 +77,7 @@ import json
 from qrafti import PanelFrame
 p1 = PanelFrame('{panel_id}', **{dates})
 p2 = p1.shift_dates(shift={shift}).persist()
-print(json.dumps({{'result_panel_id': p2.name}}))
+print(json.dumps({{'result_panel_id': p2.name, 'metadata': p2.info}}))
 """
     log_message(f"\\nExecuting code for panelframe_dates_shift:\\n{code}\\n")
     return execute_in_sandbox(code)

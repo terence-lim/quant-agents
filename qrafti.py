@@ -184,9 +184,19 @@ class PanelFrame:
         else:
             self.frame = None
 
-    #
-    # Primitive helpers
-    #
+    @property
+    def info(self) -> Dict[str, Any]:
+        """Return basic information about this PanelFrame."""
+        info = {'nlevels': self.nlevels}
+        if self.nlevels >= 1:
+            info['num_dates'] = self.frame.index.get_level_values(0).nunique()
+            info['min_date'] = str(self.frame.index.get_level_values(0).min())
+            info['max_date'] = str(self.frame.index.get_level_values(0).max())
+        if self.nlevels == 2:
+            info['max_stocks_per_date'] = self.frame.groupby(level=0).size().max()
+            info['min_stocks_per_date'] = self.frame.groupby(level=0).size().min()
+        return info
+
     @property
     def nlevels(self) -> int:
         """Number of index levels of this PanelFrame
@@ -213,27 +223,13 @@ class PanelFrame:
         else:
             return self.frame.iloc[:, 0].values
         
+    #
+    # Primitive helpers
+    #
     def to_frame(self) -> pd.DataFrame:
         """Return the underlying DataFrame of this PanelFrame."""
         return self.frame   
 
-    def copy(self, deep: bool = True) -> 'PanelFrame':
-        """Return a copy of this PanelFrame.
-        Arguments:
-            deep: If True, also copy the underlying DataFrame, otherwise just copy the reference
-        Returns:
-            A new PanelFrame with the same name, date range, and optionally a copy of the DataFrame
-        """
-        new_panel = PanelFrame()
-        new_panel.name = self.name
-        new_panel.start_date = self.start_date
-        new_panel.end_date = self.end_date
-        if deep and self.frame is not None:
-            new_panel.frame = self.frame.copy()
-        else:
-            new_panel.frame = None
-        return new_panel
-        
     def join_frame(self, other: 'PanelFrame', fillna: Any, how: str) -> pd.DataFrame:
         """Helper to join columns from another PanelFrame, and return as a DataFrame
         Arguments:
@@ -262,6 +258,23 @@ class PanelFrame:
     #
     # Primitive operations
     #
+    def copy(self, deep: bool = True) -> 'PanelFrame':
+        """Return a copy of this PanelFrame.
+        Arguments:
+            deep: If True, also copy the underlying DataFrame, otherwise just copy the metadata
+        Returns:
+            A new PanelFrame with the same name, date range, and optionally a copy of the DataFrame
+        """
+        new_panel = PanelFrame()
+        new_panel.name = self.name
+        new_panel.start_date = self.start_date
+        new_panel.end_date = self.end_date
+        if deep and self.frame is not None:
+            new_panel.frame = self.frame.copy()
+        else:
+            new_panel.frame = None
+        return new_panel
+        
     def set_name(self, name: str) -> 'PanelFrame':
         """Set the name of this PanelFrame."""
         self.name = name

@@ -46,7 +46,7 @@ mcp = FastMCP("factor-server", host="0.0.0.0", port=port)
 # p1 = PanelFrame('{panel_id}', **{dates})
 # p2 = PanelFrame('{weights_panel_id}', **{dates}) if '{weights_panel_id}' else None
 # p3 = p1.apply(weighted_average, None if p2 is None else p2).persist()
-# print(json.dumps({{'result_panel_id': p3.name}}))
+# print(json.dumps({{'result_panel_id': p3.name, 'metadata': p3.info}}))
 # """
 #     log_message(f"\\nExecuting code for panelframe_weighted_average:\\n{code}\\n")
 #     return execute_in_sandbox(code)
@@ -71,7 +71,7 @@ from qrafti import PanelFrame
 import pandas as pd
 p1 = PanelFrame('{panel_id}', **{dates})
 p2 = p1.apply(pd.DataFrame.isin, values={values}).persist()
-print(json.dumps({{'result_panel_id': p2.name}}))
+print(json.dumps({{'result_panel_id': p2.name, 'metadata': p2.info}}))
 """
     log_message(f"\nExecuting code for panelframe_isin:\n{code}\n")
     return execute_in_sandbox(code)  
@@ -96,7 +96,7 @@ from qrafti import PanelFrame, winsorize
 p1 = PanelFrame('{panel_id}', **{dates})
 p2 = PanelFrame('{indicator_panel_id}', **{dates}) if '{indicator_panel_id}' else None
 p3 = p1.apply(winsorize, None if p2 is None else p2, lower={lower}, upper={upper}).persist()
-print(json.dumps({{'result_panel_id': p3.name}}))
+print(json.dumps({{'result_panel_id': p3.name, 'metadata': p3.info}}))
 """
     log_message(f"\\nExecuting code for panelframe_winsorize:\\n{code}\\n")
     return execute_in_sandbox(code)
@@ -121,7 +121,7 @@ from qrafti import PanelFrame, quantiles
 p1 = PanelFrame('{panel_id}', **{dates})
 p2 = PanelFrame('{indicator_panel_id}', **{dates}) if '{indicator_panel_id}' else None
 p3 = p1.apply(quantiles, None if p2 is None else p2, num={num}).persist()
-print(json.dumps({{'result_panel_id': p3.name}}))
+print(json.dumps({{'result_panel_id': p3.name, 'metadata': p3.info}}))
 """
     log_message(f"\nExecuting code for panelframe_quantiles:\n{code}\n")
     return execute_in_sandbox(code)  
@@ -144,7 +144,7 @@ from qrafti import PanelFrame, spread_portfolios
 p1 = PanelFrame('{panel_id}', **{dates})
 p2 = PanelFrame('{weights_panel_id}', **{dates}) if '{weights_panel_id}' else None
 p3 = p1.apply(spread_portfolios, None if p2 is None else p2).persist()
-print(json.dumps({{'result_panel_id': p3.name}}))
+print(json.dumps({{'result_panel_id': p3.name, 'metadata': p3.info}}))
 """
     log_message(f"\\nExecuting code for panelframe_spread_portfolios:\\n{code}\\n")
     return execute_in_sandbox(code)

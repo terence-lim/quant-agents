@@ -10,6 +10,13 @@ from pydantic_ai.mcp import MCPServerStreamableHTTP
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
+# Load env vars
+load_dotenv()
+
+# Configure logging
+#logfire.configure()
+#logfire.instrument_pydantic_ai()
+
 # Settings
 always_show_manager = False
 
@@ -29,13 +36,6 @@ if False:
 
 # Streamlit page configuration
 st.set_page_config(layout="wide")
-
-# Load env vars
-load_dotenv()
-
-# Configure logging
-#logfire.configure()
-#logfire.instrument_pydantic_ai()
 
 def build_conversation_context() -> str:
     conversation_text = "\n".join(
