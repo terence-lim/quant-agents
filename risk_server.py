@@ -1,10 +1,6 @@
 # python server.py
 import json
-import sys
-import pandas as pd
 from mcp.server.fastmcp import FastMCP
-#from server import log_message, dates
-import json
 from qrafti import run_code_in_subprocess
 
 dates = dict(start_date='2020-01-01', end_date='2024-12-31')
@@ -136,20 +132,6 @@ print(json.dumps({{'image_path_name': 'file://' + str(savefig)}}))
     log_message(f"\\nExecuting code for panelframe_plot:\\n{code}\\n")
     return execute_in_sandbox(code)
 
-
-@mcp.tool()
-def get_variables_descriptions() -> dict:
-    """                                                                                                             
-    Get the PanelFrame id's and descriptions of all the variables about stocks in the database.                     
-    The variables include stocks' prices, returns, fundamentals, and technical indicators.                          
-                                                                                                                    
-    Returns:                                                                                                        
-        A dictionary with PanelFrame id's as keys and their descriptions as values.                                 
-    """
-    df = load_variables()
-    # Convert Series to dict for compatibility                                                                      
-    log_message("Fetching characteristic descriptions.")
-    return df["Description"].to_dict()
 
 if __name__ == "__main__":
     # Run with SSE transport

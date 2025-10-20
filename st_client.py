@@ -46,6 +46,7 @@ def build_conversation_context() -> str:
 # Define MCP server connection
 factor_server = MCPServerStreamableHTTP(url="http://localhost:8000/mcp")
 risk_server = MCPServerStreamableHTTP(url="http://localhost:8001/mcp")
+metadata_server = MCPServerStreamableHTTP(url="http://localhost:8002/mcp")
 
 # Create the Manager Agent with its own set of tools
 manager_agent = Agent(
@@ -65,7 +66,35 @@ factor and portfolio returns.
 You may use the get_variables_descriptions tool to look for PanelFrame ids of stocks data.
 Explain the steps you took, the planner output you received, and the agent tools you used for each step.
 """.strip(),
-    model_settings={'temperature': 0.0}  # 0.1
+    model_settings={'temperature': 0.0},
+    toolsets=[metadata_server]
+)
+
+planner_agent = Agent(
+    name="Research Planner Agent",
+    model=model,
+    system_prompt="""
+You are a planning specialist who designs execution plans for quantitative research requests.
+Review the full conversation and produce a JSON array of ordered steps.
+Each step must be a JSON object with the keys 'step number', 'description', 'agent tool', and 'computation'.
+Increment 'step number' starting at 1.
+The 'agent tool' value must be either 'factor_agent_tool' or 'risk_agent_tool', matching the agent that will
+execute the computation.
+Use 'factor_agent_tool' for tasks involving characteristic preparation, factor construction, quantile sorting,
+portfolio weighting, and any operations available from the Factor Portfolio Construction Agent such as
+panelframe_isin, panelframe_winsorize, panelframe_quantiles, panelframe_spread_portfolios, and
+get_variables_descriptions.
+Use 'risk_agent_tool' for tasks involving portfolio return generation, matrix operations like panelframe_matmul,
+date alignment with panelframe_shift_dates, performance evaluation via panelframe_performance_evaluation,
+plotting with panelframe_plot, and access to get_variables_descriptions.
+Describe the computation field with enough detail for the executing agent to know which tool call and
+parameters are needed.
+If no steps are required, return an empty JSON array.
+You may call get_variables_descriptions when you need to understand available variables, but do not delegate
+tasks yourself.
+""".strip(),
+    model_settings={'temperature': 0.0},
+    toolsets=[metadata_server]
 )
 
 planner_agent = Agent(
@@ -96,7 +125,7 @@ Do not delegate any tasks yourself and do not invoke external tools.
 # Create the agent and attach MCP server
 factor_agent = Agent(
     name="Factor Portfolio Construction Agent",
-    model=model, 
+    model=model,
     system_prompt="""
 Use the tools provided to perform factor portfolio construction tasks
 on the PanelFrame data.
@@ -106,7 +135,7 @@ you were not given or you did not generate.
 You may use the get_variables_descriptions tool to look for PanelFrame ids of stocks data.
 Explain the steps you took and the tools you used.
 """.strip(),
-    toolsets=[factor_server],
+    toolsets=[factor_server, metadata_server],
     model_settings={'temperature': 0.0}  # 0.1
 )
 
@@ -122,7 +151,7 @@ you were not given or you did not generate.
 You may use the get_variables_descriptions tool to look for PanelFrame ids of stocks data.
 Explain the steps you took and the tools you used.
 """.strip(),
-    toolsets=[risk_server],
+    toolsets=[risk_server, metadata_server],
     model_settings={'temperature': 0.0}  # 0.1
 )
 
