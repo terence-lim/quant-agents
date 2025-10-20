@@ -52,11 +52,19 @@ manager_agent = Agent(
     name="Research Manager Agent",
     model=model, 
     system_prompt="""
-Use the `risk_tool` for loading, analyzing and plotting the performance and risk of 
-factor or portfolio returns,
-and the `factor_tool` for loading stock characteristics and 
-constructing portfolios and factors.
-Explain the steps you took and the tools you used.
+You are a Research Manager Agent overseeing quantitative research tasks.
+You have access to two specialized agents: a Factor Portfolio Construction Agent
+and a Risk Agent.
+Based on the user's requests or a plan of steps, you must decide which agent is best suited
+to handle each step, and delegate each step to that agent using the appropriate tool.
+Do not perform any data analysis or factor construction yourself.
+Do not use or assume use any data, characteristics or definitions that
+you were not given or you did not generate.
+Use `factor_agent_tool` for loading stock characteristics and constructing factor portfolio weights.
+Use `risk_agent_tool` for constructing factor portfolio returns, and evaluating performance and risk of 
+factor and portfolio returns.
+You may use the get_variables_descriptions tool to look for PanelFrame ids of stocks data. 
+Explain the steps you took and the agent tools you used for each step.
 """.strip(),
     model_settings={'temperature': 0.0}  # 0.1
 )
@@ -68,6 +76,7 @@ factor_agent = Agent(
     system_prompt="""
 Use the tools provided to perform factor portfolio construction tasks
 on the PanelFrame data.
+Do not perform any steps that were assigned to other agent tools.
 Do not use or assume use any data, characteristics or definitions that
 you were not given or you did not generate. 
 You may use the get_variables_descriptions tool to look for PanelFrame ids of stocks data.
@@ -83,6 +92,7 @@ risk_agent = Agent(
     system_prompt="""
 Use the tools provided to perform factor returns performance and risk analysis tasks
 on the PanelFrame data.
+Do not perform any steps that were assigned to other agent tools.
 Do not use or assume use any data, characteristics or definitions that
 you were not given or you did not generate.
 You may use the get_variables_descriptions tool to look for PanelFrame ids of stocks data.
@@ -93,7 +103,7 @@ Explain the steps you took and the tools you used.
 )
 
 @manager_agent.tool
-async def risk_tool(ctx: RunContext, query: str) -> str:
+async def risk_agent_tool(ctx: RunContext, query: str) -> str:
     """
     Tool to delegate tasks to the Risk Agent.
     """
@@ -107,7 +117,7 @@ async def risk_tool(ctx: RunContext, query: str) -> str:
 
 
 @manager_agent.tool
-async def factor_tool(ctx: RunContext, query: str) -> str:
+async def factor_agent_tool(ctx: RunContext, query: str) -> str:
     """
     Tool to delegate tasks to the Factor Portfolio Construction Agent.
     """

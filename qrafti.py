@@ -685,7 +685,7 @@ import subprocess, sys, os#
 def run_code_in_subprocess(code_str):
     env = os.environ.copy()
     # prepend your project root to PYTHONPATH
-    env["PYTHONPATH"] = "/home/terence/Dropbox/github/thesis/src:" + env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = "/home/terence/Dropbox/github/thesis/quant-agents:" + env.get("PYTHONPATH", "")
 
     proc = subprocess.run(
         [sys.executable, "-c", code_str],
@@ -826,8 +826,9 @@ print(f"[Image File](file:///{str(savefig)})")
     print(DataCache.file_id, len(DataCache.cache_memory))
 
 #    raise Exception
-
     factor_id = p7.name
+    factor_id = 'ret_12_1'
+    ret = 'ret_vw_cap'
 #    factor_id = factor + '_' + ret
     kwargs = {'kind': 'scatter'}
     kwargs = {}
