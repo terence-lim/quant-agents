@@ -50,7 +50,7 @@ print(json.dumps({{'result_panel_id': p3.name, 'metadata': p3.info}}))
 
 
 @mcp.tool()
-def panelframe_shift_dates(panel_id: str, shift: int = 1) -> str:
+def panelframe_shift(panel_id: str, shift: int = 1) -> str:
     """
     Create a new PanelFrame with its date index shifted forward, by one date by default.
 
@@ -76,7 +76,7 @@ def panelframe_shift_dates(panel_id: str, shift: int = 1) -> str:
 import json
 from qrafti import PanelFrame
 p1 = PanelFrame('{panel_id}', **{dates})
-p2 = p1.shift_dates(shift={shift}).persist()
+p2 = p1.shift(shift={shift}).persist()
 print(json.dumps({{'result_panel_id': p2.name, 'metadata': p2.info}}))
 """
     log_message(f"\\nExecuting code for panelframe_dates_shift:\\n{code}\\n")
@@ -93,9 +93,9 @@ def panelframe_performance_evaluation(panel_id: str, benchmark_panel_id: str = '
     """
     code = f"""
 import json
-from qrafti import PanelFrame, FactorEvaluation
+from qrafti import PanelFrame, portfolio_evaluation
 p1 = PanelFrame('{panel_id}', **{dates})
-summary_dict = FactorEvaluation(p1).summary()
+summary_dict = portfolio_evaluation(p1)
 print(json.dumps(summary_dict))
 """
     log_message(f"\\nExecuting code for panelframe_performance_evaluation:\\n{code}\\n")
@@ -117,7 +117,7 @@ def panelframe_plot(panel_id: str, other_panel_id: str = '', kind: str ='line', 
     """
     code = f"""
 import json
-from qrafti import PanelFrame, MEDIA_PATH
+from qrafti import PanelFrame, MEDIA
 import matplotlib.pyplot as plt
 p1 = PanelFrame('{panel_id}', **{dates})
 p2 = PanelFrame('{other_panel_id}', **{dates}) if '{other_panel_id}' else None
@@ -125,7 +125,7 @@ if p2:
     fig = p1.plot(p2, kind='{kind}', title='{title}')
 else:
     fig = p1.plot(kind='{kind}', title='{title}')
-savefig = MEDIA_PATH / f"plot_{panel_id}.png"
+savefig = MEDIA / f"plot_{panel_id}.png"
 plt.savefig(savefig)
 print(json.dumps({{'image_path_name': 'file://' + str(savefig)}}))
 """

@@ -72,15 +72,23 @@ Explain the steps you took, the planner output you received, and the agent tools
     model_settings={'temperature': 0.0},
     toolsets=[metadata_server]
 )
+
 # , which provides an agent tool and description for each step in JSON format,
+# Review the full conversation and produce a JSON array of ordered steps.
+# Each step must be a JSON object with the keys 'step number', 'description' and 'agent tool'.
+# Increment 'step number' starting at 1.
+# If no steps are required, return an empty JSON array.
+
+
 planner_agent = Agent(
     name="Research Planner Agent",
     model=model,
     system_prompt="""
 You are a planning specialist who designs execution plans for quantitative research requests.
-Review the full conversation and produce a JSON array of ordered steps.
-Each step must be a JSON object with the keys 'step number', 'description' and 'agent tool'.
-Increment 'step number' starting at 1.
+Review the full conversation and produce a sequence of steps,
+where each step includes a 'step number', 'description' and 'agent tool'.
+Each step's 'description' should clearly explain the task to be performed.
+You may call get_variables_descriptions when you need to understand available variables, before designing your plan.
 The 'agent tool' value must be either 'factor_agent_tool' or 'risk_agent_tool', matching the agent that will
 perform the step.
 
@@ -109,15 +117,14 @@ get_variables_descriptions.
 Use 'risk_agent_tool' for tasks involving portfolio return generation, matrix operations like panelframe_matmul,
 date alignment with panelframe_shift_dates, performance evaluation via panelframe_performance_evaluation,
 plotting with panelframe_plot, and access to get_variables_descriptions.
-If no steps are required, return an empty JSON array.
-You may call get_variables_descriptions when you need to understand available variables, but do not delegate
-tasks yourself.
+
 """.strip(),
     model_settings={'temperature': 0.0},
     toolsets=[metadata_server]
 )
 
-
+#You may call get_variables_descriptions when you need to understand available variables, but do not delegate
+# tasks yourself.
 # Describe the computation field with enough detail for the executing agent to know which tool call and
 # parameters are needed.
 
@@ -129,6 +136,8 @@ factor_agent = Agent(
     system_prompt="""
 Use the tools provided to perform factor portfolio construction tasks
 on the PanelFrame data.
+Be sure to include supporting reference PanelFrames where required in your tool calls to ensure
+all information in the query is captured accurately.
 Do not perform any steps that were assigned to other agent tools.
 Do not use or assume use any data, characteristics or definitions that
 you were not given or you did not generate. 
@@ -145,6 +154,8 @@ risk_agent = Agent(
     system_prompt="""
 Use the tools provided to perform factor returns performance and risk analysis tasks
 on the PanelFrame data.
+Be sure to include supporting reference PanelFrames where required in your tool calls to ensure
+all information in the query is captured accurately.
 Do not perform any steps that were assigned to other agent tools.
 Do not use or assume use any data, characteristics or definitions that
 you were not given or you did not generate.

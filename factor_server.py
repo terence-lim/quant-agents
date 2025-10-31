@@ -77,14 +77,14 @@ print(json.dumps({{'result_panel_id': p2.name, 'metadata': p2.info}}))
     return execute_in_sandbox(code)  
     
 @mcp.tool()
-def panelframe_winsorize(panel_id: str, indicator_panel_id: str = '', lower: float = 0.0, upper: float = 1.0) -> str:
+def panelframe_winsorize(panel_id: str, reference_panel_id: str = '', lower: float = 0.0, upper: float = 1.0) -> str:
     """
     Create a PanelFrame that winsorizes the values of the given panel data.
     Args:
         panel_id (str): The id of the panel data set to winsorize.
         upper (float): The upper percentile to winsorize to (between 0 and 1).
         lower (float): The lower percentile to winsorize to (between 0 and 1).
-        reference_panel_id (str, optional): The id of the indicator panel data set which indicates which
+        reference_panel_id (str, optional): The id of the reference panel data set which indicates which
             rows of the panel data set to use for computing the upper and lower bounds.
             If not provided, the winsorization bounds will be computed based on all the values in the panel_id data set.
     Returns:
@@ -94,7 +94,7 @@ def panelframe_winsorize(panel_id: str, indicator_panel_id: str = '', lower: flo
 import json
 from qrafti import PanelFrame, winsorize
 p1 = PanelFrame('{panel_id}', **{dates})
-p2 = PanelFrame('{indicator_panel_id}', **{dates}) if '{indicator_panel_id}' else None
+p2 = PanelFrame('{reference_panel_id}', **{dates}) if '{reference_panel_id}' else None
 p3 = p1.apply(winsorize, None if p2 is None else p2, lower={lower}, upper={upper}).persist()
 print(json.dumps({{'result_panel_id': p3.name, 'metadata': p3.info}}))
 """
@@ -103,7 +103,7 @@ print(json.dumps({{'result_panel_id': p3.name, 'metadata': p3.info}}))
 
 
 @mcp.tool()
-def panelframe_quantiles(panel_id: str, num: int, indicator_panel_id: str = '') -> str:
+def panelframe_quantiles(panel_id: str, num: int, reference_panel_id: str = '') -> str:
     """
     Create a PanelFrame that computes the quantiles of the given panel data.
     Args:
@@ -117,10 +117,10 @@ def panelframe_quantiles(panel_id: str, num: int, indicator_panel_id: str = '') 
     """
     code = f"""
 import json
-from qrafti import PanelFrame, quantiles
+from qrafti import PanelFrame, digitize
 p1 = PanelFrame('{panel_id}', **{dates})
-p2 = PanelFrame('{indicator_panel_id}', **{dates}) if '{indicator_panel_id}' else None
-p3 = p1.apply(quantiles, None if p2 is None else p2, num={num}).persist()
+p2 = PanelFrame('{reference_panel_id}', **{dates}) if '{reference_panel_id}' else None
+p3 = p1.apply(digitize, None if p2 is None else p2, cuts={num}).persist()
 print(json.dumps({{'result_panel_id': p3.name, 'metadata': p3.info}}))
 """
     log_message(f"\nExecuting code for panelframe_quantiles:\n{code}\n")
