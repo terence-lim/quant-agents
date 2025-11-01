@@ -103,24 +103,31 @@ print(json.dumps({{'result_panel_id': p3.name, 'metadata': p3.info}}))
 
 
 @mcp.tool()
-def Panel_quantiles(panel_id: str, num: int, reference_panel_id: str = '') -> str:
-    """
-    Create a Panel that computes the quantiles of the given panel data.
+def Panel_quantiles(
+    panel_id: str,
+    cuts: int | list[float],
+    reference_panel_id: str = '',
+    ascending: bool = True,
+) -> str:
+    """Discretize panel values into quantile bins using :func:`qrafti.digitize`.
+
     Args:
-        panel_id (str): The id of the panel data set to compute quantiles for.
-        num (int): The number of quantiles to compute.
-        reference_panel_id (str, optional): The id of the indicator panel data set which indicates which
-            rows of the panel data set to use for computing the quantile breakpoints.
-            If not provided, the quantiles will be computed based on all the values in the panel_id data set.
+        panel_id (str): Identifier for the panel data whose first column will be discretized.
+        cuts (int | list[float]): Number of quantile-based bins to create, or explicit breakpoints in ``[0, 1]``.
+        reference_panel_id (str, optional): Identifier of the indicator panel whose boolean values select
+            which rows contribute to the quantile breakpoints. Defaults to using all rows when omitted.
+        ascending (bool, optional): If ``True`` (default), lower values receive lower bin labels; otherwise
+            the labels are reversed.
+
     Returns:
-        str: the id of the created Panel in the cache in json format
+        str: JSON payload containing the persisted panel identifier and metadata for the discretized results.
     """
     code = f"""
 import json
 from qrafti import Panel, digitize
 p1 = Panel('{panel_id}', **{dates})
 p2 = Panel('{reference_panel_id}', **{dates}) if '{reference_panel_id}' else None
-p3 = p1.apply(digitize, None if p2 is None else p2, cuts={num}).persist()
+p3 = p1.apply(digitize, None if p2 is None else p2, cuts={cuts}, ascending={ascending}).persist()
 print(json.dumps({{'result_panel_id': p3.name, 'metadata': p3.info}}))
 """
     log_message(f"\nExecuting code for Panel_quantiles:\n{code}\n")
