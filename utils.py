@@ -1,211 +1,33 @@
-# Use 'factor_agent_tool' for tasks involving characteristic preparation, factor construction, quantile sorting,
-# portfolio weighting, and any operations available from the Factor Portfolio Construction Agent such as
-# Panel_isin, Panel_winsorize, Panel_quantiles, Panel_spread_portfolios, and
-# get_variables_descriptions.
-# Use 'risk_agent_tool' for tasks involving generating portfolio returns and performance evaluation
-# plotting with Panel_plot, and access to get_variables_descriptions.
+import json
+from qrafti import run_code_in_subprocess
+from datetime import datetime
 
-# Factor Agent tool catalog:
-# - Panel_isin: filter a Panel to identifiers contained in a supplied list.
-# - Panel_winsorize: winsorize values using optional indicator Panel and percentile bounds.
-# - Panel_quantiles: assign quantile buckets using optional indicator Panel.
-# - Panel_spread_portfolios: build long-short spread portfolios with optional weights Panel.
-# - get_variables_descriptions: inspect available variables and cache identifiers via the metadata server.
+dates_ = dict(start_date='2020-01-01', end_date='2024-12-31')
 
-# Risk Agent tool catalog:
-# - Panel_matmul: compute matrix multiplication between two Panels.
-# - Panel_shift_dates: shift a Panel's dates forward or backward by an integer step.
-# - Panel_performance_evaluation: summarize factor performance statistics for a Panel of returns.
-# - Panel_plot: create plots for one or two Panels and return the saved image path.
-# - get_variables_descriptions: inspect available variables and cache identifiers via the metadata server.
+def log_message(payload: str, tool_name: str, code: str, mode: str = "a"):
+    """Log a message to the console and a log file."""
+    code = "\n".join([line for line in code.splitlines() if len(line) and 'import ' not in line])
+    message = f"Output: {payload}\nTool: {tool_name}{' '*10}Date: {str(datetime.now())[:19]}\n{code}\n\n{'-'*60}\n\n"
+    with open("mcp_server.log", "a") as f:
+        f.write(message)
+    print(message)
 
+# log_message(f"MCP server started on {str(datetime.now())}", mode="w")
 
-#You may call get_variables_descriptions when you need to understand available variables, but do not delegate
-# tasks yourself.
-# Describe the computation field with enough detail for the executing agent to know which tool call and
-# parameters are needed.
-
-
-
-import pandas as pd
-from qrafti import Panel, Calendar, DATE_NAME, STOCK_NAME
-def factor_generate(factor: Panel, lags: int, window: int, univ: Panel = None) -> Panel:
-    """Generate a factor Panel from rolling windows based on universe filter.
-    Arguments:
-        lags: Number of months to lag the factor values
-        window: Window size for rolling accumulation of factor values
-        univ: Optional Panel of universe filter
-    Returns:
-        Panel of generated factor values
+def execute_in_sandbox(code_str: str) -> str:
     """
-    assert factor.nlevels == 2, "Factor must have two index levels"
-    cal = Calendar()
-    factor_dates = factor.dates
-    start_date = cal.offset(factor_dates[0], offset=lags, strict=False)
-    end_date = cal.offset(factor_dates[-1], offset=lags, strict=False)
-    factor_final = []
-    for next_date in cal.dates_range(start_date, end_date):
-        # For each date, collect data from lagged window
-        start_window = cal.offset(next_date, offset = -(window + lags), strict=False)
-        end_window = cal.offset(next_date, offset = -lags, strict=False)
-        for curr_date in cal.dates_range(start_window, end_window):
-            if curr_date in factor_dates:
-                factor_df = factor.frame.xs(curr_date, level=0).reset_index()
-                factor_df[DATE_NAME] = next_date
-                factor_df['_date_'] = curr_date
-                factor_final.append(factor_df)
-
-    # sort by STOCK_NAME, DATE_NAME and _date_ and drop duplicates, keep last
-    factor_final = pd.concat(factor_final, axis=0)
-    factor_final = factor_final.sort_values(by=[STOCK_NAME, DATE_NAME, '_date_'])
-    factor_final = factor_final.drop_duplicates(subset=[STOCK_NAME, DATE_NAME], keep='last')
-    factor_final = factor_final.set_index([DATE_NAME, STOCK_NAME]).drop(columns=['_date_'])
-
-    # require index to be in univ.frame
-    factor_final = factor_final.join(univ.frame, how='inner', rsuffix='_univ').iloc[:, :1]
-    factor_final = Panel().set_frame(factor_final)
-    return factor_final
-
-
-def weighted_average(x):
+    Safely execute a Python code string in a sandbox and return the output as JSON string.
     """
-    Compute the weighted average of the first column, weighted by the last column.
-    Arguments:
-        x: DataFrame with at least two columns, first column is the data to be averaged,
-           last column is the weight for each row
-    Returns:
-        float: Weighted average of the first column
-    Usage:
-        panel_frame.apply(weighted_average, weights or 1, fill_value=0)
-    """
-    return (x.iloc[:, 0] * x.iloc[:, 1]).sum() / x.iloc[:, 1].sum()
+    stdout, stderr, exit_code = run_code_in_subprocess(code_str)
+    print('Exit code:', exit_code)
+    print(stderr)
+    if exit_code:
+        return json.dumps({"exit_code": exit_code, "error": stderr.strip()})
+    else:
+        return stdout.strip()
 
-
-"""
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-data = [44, 45, 40, 41, 39]
-labels = ['Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5']
-
-# declaring exploding pie
-explode = [0, 0.1, 0, 0, 0]
-
-# define Seaborn color palette to use
-colors = sns.color_palette('dark')
-
-# plotting data on chart
-plt.pie(data, labels=labels, colors=colors, explode=explode, autopct='%.0f%%')
-plt.show()
-"""
-
-country_dict = {
-    'USA': "United States",
-    "JPN": "Japan",
-    "GBR": "United Kingdom",
-    "CAN": "Canada",
-    "FRA": "France",
-    "DEU": "Germany",
-    "AUS": "Australia",
-    "CHE": "Switzerland",
-    "NLD": "Netherlands",
-    "HKG": "Hong Kong",
-    "ESP": "Spain",
-    "SWE": "Sweden",
-    "DNK": "Denmark",
-    "ITA": "Italy",
-    "BEL": "Belgium",
-    "SGP": "Singapore",
-    "NOR": "Norway",
-    "FIN": "Finland",
-    "ISR": "Israel",
-    "AUT": "Austria",
-    "IRL": "Ireland",
-    "NZL": "New Zealand",
-    "PRT": "Portugal",
-}
-
-"""
-TODO:
-- def TimeFrame.performance(): annualized return, volatility, sharpe ratio, max drawdown
-- def Panel.turnover()
-- Download and check JKP factors
-"""
-
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-def pie_chart(data, labels, title: str, ncol=3):
-    """Plot a pie chart with the given data and labels."""
-    colors = sns.color_palette('pastel')
-
-    fig, ax = plt.subplots(figsize=(8, 6))
-
-    wedge_width = 0.5
-    pctdistance = 1 - wedge_width / 2
-
-    wedges, texts, autotexts = ax.pie(
-        data,
-        labels=labels,                 # show labels on wedges
-        colors=colors,
-        startangle=90,
-        wedgeprops=dict(width=wedge_width),
-        autopct=lambda pct: f"{pct:.0f}%",
-        pctdistance=pctdistance
-    )
-
-    # --- Adjust label styles ---
-    for text in texts:
-        text.set_fontsize(16)          # category labels (outside wedges)
-#        text.set_weight('bold')
-        text.set_color('black')
-
-    for autotext in autotexts:
-        autotext.set_fontsize(14)        # increase font size
-        autotext.set_color('black')
-#        autotext.set_weight('bold')
-
-    # bold title, large font
-    ax.set_title(title, fontweight='bold', fontsize=18)
-
-    # Adjust legend placement: lower center, wide layout
-    ax.legend(
-        wedges,
-        labels,
-        fontsize=14,
-        loc='lower center',
-        bbox_to_anchor=(0.5, -0.1),  # center below chart
-        ncol=ncol,
-        #ncol=(len(labels)+1)//2,            # all items in one row
-        frameon=False
-    )
-
-if __name__ == "__main__":
-    data = {"GPT family":58, "Claude":13, "LLaMA":11, "Gemini": 11, "other":7}
-    pie_chart(data.values(), data.keys(), title="Models Employed (%)")
-    plt.tight_layout()
-    plt.savefig("models.svg", bbox_inches='tight')
-
-    data = {"Social media": 25, "Education": 21, "Software": 20, "Healthcare": 16, "Arts/Humanities": 18}
-    pie_chart(data.values(), data.keys(), title="Datasets by Domain (%)")
-    plt.tight_layout()
-    plt.savefig("domain.svg", bbox_inches='tight')
-
-    data = {"Zero-shot":35, "Few-shot":16, "Chain-of-thought": 13, "Reflexion":15, "Tool/agent":11}
-    pie_chart(data.values(), data.keys(), title="Prompting Strategies (%)")
-    plt.tight_layout()
-    plt.savefig("prompting.svg", bbox_inches='tight')
-
-    data = {"Human review":40, "Similarity metrics":27, "Task-based":13, "hybrid":20}
-    pie_chart(data.values(), data.keys(), title="Evaluation Fragmentation (%)")
-    plt.tight_layout()
-    plt.savefig("evaluation.svg", bbox_inches='tight')
-
-    data = dict(Inductive=64, Hybrid=22, Deductive=9)
-    pie_chart(data.values(), data.keys(), title="Type of Thematic Analysis (%)")
-    plt.tight_layout()
-    plt.savefig("TA.svg", bbox_inches='tight')
-    
-    plt.show()
-
-
+def _log_and_execute(tool_name: str, code: str) -> str:
+    """Helper to log generated code and execute it in the sandbox."""
+    payload = execute_in_sandbox(code)
+    log_message(str(payload), tool_name, code)
+    return payload

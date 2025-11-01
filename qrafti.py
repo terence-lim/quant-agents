@@ -24,6 +24,8 @@ MEDIA = DATA_LAKE / 'media'
 STOCK_NAME = 'permno'
 DATE_NAME = 'eom'
 UNIVERSE_PANEL = 'SIZE_DECILE' # 'ret_exc_lead1m'
+
+
 ###########################
 #
 # Data Cache library for persisting intermediate DataFrames
@@ -191,10 +193,6 @@ class Calendar:
         if not strict:
             return self.dates.index[0 if i < 0 else -1]
         return ''
-
-def frame_info(frame: pd.DataFrame) -> Dict[str, Any]:
-    """Return basic information about a DataFrame."""
-    return frame.groupby(level=0).size().to_dict()
 
 
 ###########################
@@ -534,14 +532,24 @@ class Panel:
         """Boolean negation of the values of this Panel."""
         return Panel().set_frame(~self.frame.astype(bool))
 
-    def log(self) -> 'Panel':
-        """Logarithm of the values of this Panel."""
-        return Panel().set_frame(self.frame.apply(np.log))
+    # TO DO: log and exp are not unary -- should be apply, pow and rpow are binary
+    #def log(self) -> 'Panel':
+    #    """Logarithm of the values of this Panel."""
+    #    return Panel().set_frame(self.frame.apply(np.log))
 
-    def exp(self) -> 'Panel':
-        """Exponentiate the values of this Panel."""
-        return Panel().set_frame(self.frame.apply(np.exp))
+    #def exp(self) -> 'Panel':
+    #    """Exponentiate the values of this Panel."""
+    #    return Panel().set_frame(self.frame.apply(np.exp))
 
+    #def __pow__(self, other):
+    #    # Allow exp-like behavior: e.g., math.e ** x
+    #    return MyNumber(self.value ** other)
+
+    #def __rpow__(self, other):
+    #    # Allow exp(x) ≈ math.e ** x
+    #    return MyNumber(other ** self.value)
+
+    #
     #
     # Panel Group Utility Functions
     #
@@ -627,7 +635,7 @@ class Panel:
             out_panel._frame = df.set_index([DATE_NAME, STOCK_NAME][:nlevels]).sort_index(level=list(range(nlevels)))
         return out_panel
 
-    def filter(self, min_value: float = None, max_value: float = None, values: List = None,
+    def filter(self, min_value: float = None, max_value: float = None, isin: List = None,
                start_date: str = None, end_date: str = None, dates: List[str] = None, 
                dropna: bool = False, mask: 'Panel' = None, index: 'Panel' = None,
                stocks: List[int] = None, min_stocks: int = None) -> 'Panel':
@@ -640,7 +648,7 @@ class Panel:
             min_stocks: Optional minimum number of stocks per date to keep the date
             min_value: Optional minimum value to keep the row
             max_value: Optional maximum value to keep the row
-            values: Optional list of values to keep the row
+            isin: Optional list of values to keep the row
             mask: Optional Panel of boolean values to filter the DataFrame
             index: Optional Panel whose index to keep in the DataFrame
             dropna: If True, drop rows with NaN values
@@ -663,8 +671,8 @@ class Panel:
             df = df[df.iloc[:, 0] >= min_value]
         if max_value is not None:
             df = df[df.iloc[:, 0] <= max_value]
-        if values is not None:
-            df = df[df.iloc[:, 0].isin(values)]
+        if isin is not None:
+            df = df[df.iloc[:, 0].isin(isin)]
         if dropna:
             df = df[df.iloc[:, 0].notna()]
         if isinstance(mask, Panel) and mask.nlevels == self.nlevels:
@@ -704,6 +712,26 @@ class Panel:
         df.plot(**kwargs)
 
 #
+# Utility functions for Panels
+#
+def frame_info(frame: pd.DataFrame) -> Dict[str, Any]:
+    """Return basic information about a DataFrame."""
+    return frame.groupby(level=0).size().to_dict()
+
+def panel_or_numeric(x: str, **kwargs) -> Union[Panel, float, int]:
+    """Convert a string to a Panel or numeric value."""
+    if x is None or x in ['', 'None']:
+        return None
+    try:
+        if '.' in x:
+            return float(x)
+        else:
+            return int(x)
+    except:
+        return Panel(x, **kwargs)
+
+
+#
 # Common tools to be constructed with Panel.apply()
 #
 def winsorize(x, lower=0.0, upper=1.0) -> pd.Series:
@@ -719,7 +747,6 @@ def winsorize(x, lower=0.0, upper=1.0) -> pd.Series:
     Usage:
         panel_frame.apply(winsorize, indicator or True, fill_value=False, lower=lower, upper=upper)     
     """
-    print(x)
     lower, upper = x.loc[x.iloc[:,1].astype(bool), x.columns[0]].quantile([lower, upper]).values
     return x.iloc[:, 0].clip(lower=lower, upper=upper)
 
@@ -750,17 +777,24 @@ def digitize(x, cuts: int | List[float], ascending: bool = True) -> pd.Series:
         ranks = len(breakpoints) - ranks.astype(int) + 1
     return ranks.astype(int)
 
-def portfolio_weights(x, leverage: float = 1.0) -> pd.Series:
-    """Scale the the weights to sum to the given leverage
+def portfolio_weights(x, leverage: float = 1.0, net: bool = True) -> pd.Series:
+    """Scale the the portfolio weights to sum to the given leverage
     Arguments:
-        x: DataFrame with weights
+        x: DataFrame with initial portfolio weights
         leverage: Total leverage to scale the weights to
+        net: If False, scale the average of the sum of absolute long and short weights to the leverage.  
+             If True (default), scale the absolute sum of weights to the leverage. 
     Returns:
         pd.Series with the scaled weights
     Usage:
-        panel_frame.apply(portfolio_weights, leverage=leverage)
+        panel_frame.apply(portfolio_weights, leverage=leverage, net=False)
     """
-    total_weight = x.iloc[:, 0].abs().sum()
+    long_weight = x.loc[x.iloc[:,0] > 0, x.columns[0]].sum()
+    short_weight = x.loc[x.iloc[:,0] < 0, x.columns[0]].sum()
+    if net:
+        total_weight = abs(long_weight + short_weight)
+    else:
+        total_weight = (abs(long_weight) + abs(short_weight)) / 2
     if total_weight == 0:
         return x.iloc[:, 0].rename(x.columns[0])
     return x.iloc[:, 0].mul(abs(leverage)).div(total_weight).rename(x.columns[0])
@@ -932,9 +966,6 @@ def portfolio_impute(port_weights: Panel, retx: Panel = None,
     else:       # only return imputed portfolio weights
         return port_weights
 
-#
-# Portfolio Functions
-#
 def portfolio_returns(port_weights: 'Panel', price_changes: 'Panel' = None,
                       stock_returns: 'Panel' = None) -> 'Panel':
     """Compute the portfolio returns given portfolio weights and stock returns.
@@ -965,6 +996,44 @@ def portfolio_evaluation(port_returns: Panel) -> Dict[str, float]:
 if __name__ == "__main__":
     tic = time.time()
 
+    print(str(datetime.now()))
+
+    # Unit Test 6: pipeline
+    ret = 'ret_vw_cap'
+    factor = 'ret_12_1'
+    dates = dict(start_date='1975-01-01', end_date='2024-12-31')
+    dates = dict(start_date='2020-01-01', end_date='2024-12-31')
+
+    factor_pf = Panel(factor, **dates)
+
+    size_pf = Panel('me', **dates)
+
+#    nyse_pf = Panel('crsp_exchcd', **dates).apply(pd.DataFrame.isin, values=[1, '1'])
+    nyse_pf = Panel('crsp_exchcd', **dates).filter(isin=[1])
+
+    decile_pf = size_pf.apply(digitize, nyse_pf, cuts=10)
+
+    quantiles_pf = factor_pf.apply(digitize, decile_pf > 2, cuts=3)
+    vwcap_pf = Panel('me', **dates).apply(winsorize, nyse_pf, lower=0, upper=0.80)
+    bench = Panel(factor + '_' + ret, **dates)
+
+    # original approach
+    spreads_pf = quantiles_pf.apply(spread_portfolios, vwcap_pf)
+    portfolio_returns(spreads_pf).plot(bench, kind='scatter')
+
+    # take the difference of two portfolios and construct returns
+    high_pf = vwcap_pf.filter(mask=quantiles_pf == 3).apply(portfolio_weights)
+    low_pf = vwcap_pf.filter(mask=quantiles_pf == 1).apply(portfolio_weights)
+    diff_pf = high_pf - low_pf
+    portfolio_returns(diff_pf).plot(bench, kind='scatter')
+
+    # construct separate returns and take the difference
+    high_ret = portfolio_returns(high_pf)
+    low_ret = portfolio_returns(low_pf)
+    diff_ret = high_ret - low_ret
+    diff_ret.plot(bench, kind='scatter')
+
+if False:
     # Get Universe
     dates = dict(start_date='1970-01-01', end_date='2024-12-31') #'2020-01-01'
     dates = dict(start_date='2020-01-01', end_date='2024-12-31') #

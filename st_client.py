@@ -4,6 +4,7 @@ import streamlit as st
 import asyncio
 from dotenv import load_dotenv
 from pydantic_ai import Agent, RunContext
+from pydantic_ai.exceptions import UnexpectedModelBehavior
 from pydantic_ai.mcp import MCPServerStreamableHTTP
 #import logfire
 
@@ -45,7 +46,7 @@ def build_conversation_context() -> str:
 
 # Define MCP server connection
 factor_server = MCPServerStreamableHTTP(url="http://localhost:8000/mcp")
-risk_server = MCPServerStreamableHTTP(url="http://localhost:8001/mcp")
+performance_server = MCPServerStreamableHTTP(url="http://localhost:8001/mcp")
 metadata_server = MCPServerStreamableHTTP(url="http://localhost:8002/mcp")
 
 # Create the Manager Agent with its own set of tools
@@ -53,25 +54,26 @@ manager_agent = Agent(
     name="Research Manager Agent",
     model=model,
     system_prompt="""
-You are a Research Manager Agent overseeing quantitative research tasks.
-Do not perform any data analysis or factor construction yourself.
-Use factor_agent_tool for loading stock characteristics and constructing factor portfolio weights.
-Use risk_agent_tool for constructing factor portfolio returns, and evaluating performance and risk of
-factor and portfolio returns.
-Use planner_agent_tool to request a step-by-step plan
-for the user's latest query.
+You are a Research Manager Agent who interacts with the user and oversees quantitative research tasks.
+Use factor_agent_tool for loading stock characteristics and constructing factor portfolio weights and returns.
+Use performance_agent_tool for evaluating performance and risk of factor and portfolio returns.
+Use planner_agent_tool to request a step-by-step plan for the user's query.
 To execute the plan, you should sequentially execute each step by calling the appropriate agent tool.
 For each step in the plan, delegate only that step and its description to the specialized agent specified in the 'agent tool' field of the step; 
 then delegate the next step to the specialized agent specified in the next step, and so on.
 Do not perform any steps that were assigned to other agent tools.
+If a specialized agent tool could not complete a step because it was assigned to a different agent tool, 
+then you should delegate the step to to the specialized agent it was assigned to.
 You may use the get_variables_descriptions tool to look for Panel ids of stocks data.
-Do not use or assume use any data, characteristics or definitions that
-you were not given or you did not generate.
-Explain the steps you took, the planner output you received, and the agent tools you used for each step.
+Do not use or assume any data, characteristics or definitions that you were not given or you did not generate from a specialized agent.
+Explain to the user the steps you took, the planner output you received and the agent tools you used for each step;
+do not output in JSON format or python code, but you should use bulleted points or narrative format for clarity.
 """.strip(),
     model_settings={'temperature': 0.0},
     toolsets=[metadata_server]
 )
+
+# Do not perform any data analysis or factor construction yourself.
 
 # , which provides an agent tool and description for each step in JSON format,
 # Review the full conversation and produce a JSON array of ordered steps.
@@ -86,21 +88,25 @@ planner_agent = Agent(
     system_prompt="""
 You are a planning specialist who designs execution plans for quantitative research requests.
 Review the full conversation and produce a sequence of steps,
-where each step includes a 'step number', 'description' and 'agent tool'.
+where each step includes a 'step number', 'description', 'agent tool' and list of tools to be used by each agent.
 Each step's 'description' should clearly explain the task to be performed.
 You may call get_variables_descriptions when you need to understand available variables, before designing your plan.
-The 'agent tool' value must be either 'factor_agent_tool' or 'risk_agent_tool', matching the agent that will
+The 'agent tool' value must be either 'factor_agent_tool' or 'performance_agent_tool', matching the agent that will
 perform the step.
+Call get_specialized_agent_tools whenever you need to confirm which capabilities the agents expose.
+Do not use or assume any agents or tools that you were not given.
 
 Use 'factor_agent_tool' for tasks involving characteristic preparation, factor construction, quantile sorting,
-portfolio weighting, and any computation that relies on the factor agent's tools.
-Use 'risk_agent_tool' for tasks involving portfolio or factor return generation and evaluation, risk reporting,
-plotting, and any computation that relies on the risk agent's tools.
-
+portfolio weighting, portfolio or factor returns generation, and any computation that relies on the factor agent's tools.
+Use 'performance_agent_tool' for tasks involving portfolio or factor returns evaluation, risk reporting,
+plotting, and any computation that relies on the performance agent's tools.
 """.strip(),
     model_settings={'temperature': 0.0},
     toolsets=[metadata_server]
 )
+
+
+# The plan should include the tools that the specialized agents will use to perform each step.
 
 
 # Create the agent and attach MCP server
@@ -108,49 +114,48 @@ factor_agent = Agent(
     name="Factor Portfolio Construction Agent",
     model=model,
     system_prompt="""
-Use the tools provided to perform factor portfolio construction tasks
-on the Panel data.
+Use the tools provided to construct factor or portfolio characteristics, weights or returns on the Panel data.
 Be sure to include supporting reference Panels where required in your tool calls to ensure
 all information in the query is captured accurately.
 Do not perform any steps that were assigned to other agent tools.
-Do not use or assume use any data, characteristics or definitions that
-you were not given or you did not generate. 
+If a tool call returned an unexpected error, try calling once more with the same parameters.
+Do not use or assume any data, characteristics or definitions that you were not given or you did not generate with a tool
 You may use the get_variables_descriptions tool to look for Panel ids of stocks data.
-Explain the steps you took and the tools you used.
+Explain in detail every step you took and all the tools you used.
 """.strip(),
     toolsets=[factor_server, metadata_server],
     model_settings={'temperature': 0.0}  # 0.1
 )
 
-risk_agent = Agent(
-    name="Risk Agent",
+performance_agent = Agent(
+    name="Performance Agent",
     model=model, 
     system_prompt="""
-Use the tools provided to perform factor returns performance and risk analysis tasks
-on the Panel data.
+Use the tools provided to perform performance evaluation and risk analysis tasks
+on factor and portfolio returns Panel data.
 Be sure to include supporting reference Panels where required in your tool calls to ensure
 all information in the query is captured accurately.
 Do not perform any steps that were assigned to other agent tools.
-Do not use or assume use any data, characteristics or definitions that
-you were not given or you did not generate.
+If a tool call returned an unexpected error, try calling once more with the same parameters.
+Do not use or assume use any data, characteristics or definitions that you were not given or you did not generate with a tool.
 You may use the get_variables_descriptions tool to look for Panel ids of stocks data.
-Explain the steps you took and the tools you used.
+Explain in detail every step you took and all the tools you used.
 """.strip(),
-    toolsets=[risk_server, metadata_server],
+    toolsets=[performance_server, metadata_server],
     model_settings={'temperature': 0.0}  # 0.1
 )
 
 @manager_agent.tool
-async def risk_agent_tool(ctx: RunContext, query: str) -> str:
+async def performance_agent_tool(ctx: RunContext, query: str) -> str:
     """
-    Tool to delegate tasks to the Risk Agent.
+    Tool to delegate tasks to the Performance Agent.
     """
     st.session_state.manager_delegated = True
     full_query = build_conversation_context()
-    print("\n**Full query to Risk tool>> ", full_query, '>>')
-    response = await risk_agent.run(full_query)
+    print("\n**Full query to Performance tool>> ", full_query, '>>')
+    response = await performance_agent.run(full_query)
     out = response.output if hasattr(response, "output") else str(response)
-    st.session_state.messages.append({"role": "Risk Agent", "content": f"{out}"})
+    st.session_state.messages.append({"role": "Performance Agent", "content": f"{out}"})
     return out  # << return TEXT, not RunResult
 
 
@@ -174,7 +179,25 @@ async def planner_agent_tool(ctx: RunContext, query: str) -> str:
     full_query = build_conversation_context()
     if query:
         full_query = f"{full_query}\n\nManager instructions: {query}"
-    response = await planner_agent.run(full_query)
+    ### --old code--
+    # response = await planner_agent.run(full_query)
+    ### --old code--
+    ### --new code--
+    try:
+        response = await planner_agent.run(full_query)
+    except UnexpectedModelBehavior:
+        out = (
+            "The planner agent could not generate a response because the Gemini model returned an empty payload. "
+            "Please retry your request or switch to a different model."
+        )
+        st.session_state.messages.append({"role": "Planner Agent", "content": out})
+        return out
+    except Exception as exc:  # pragma: no cover - defensive guard for unexpected runtime issues
+        out = f"Planner agent failed with an unexpected error: {exc}"
+        st.session_state.messages.append({"role": "Planner Agent", "content": out})
+        return out
+    ### --end new code--
+
     out = response.output if hasattr(response, "output") else str(response)
 #    st.session_state.messages.append({"role": "Planner Agent", "content": f"{out}"})
     return out
