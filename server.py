@@ -277,6 +277,22 @@ print(json.dumps({{'result_panel_id': p2.name}}))
 SPECIALIZED_AGENT_TOOLS: Dict[str, List[Dict[str, str]]] = {
     "factor_agent_tool": [
         {
+            "name": "Panel_characteristics_snapshots",
+            "description": "Capture forward-filled characteristic snapshots for selected calendar months.",
+        },
+        {
+            "name": "Panel_characteristics_fill",
+            "description": "Fill characteristic panels sequentially using fallback sources and optional value replacements.",
+        },
+        {
+            "name": "Panel_portfolio_turnover",
+            "description": "Measure turnover by imputing drifted portfolio weights with optional return inputs.",
+        },
+        {
+            "name": "Panel_sequence",
+            "description": "Compute per-stock observation sequence numbers via cumulative counts.",
+        },
+        {
             "name": "Panel_winsorize",
             "description": "Winsorize panel values using optional reference weights and percentile cutoffs.",
         },

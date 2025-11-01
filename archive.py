@@ -100,6 +100,28 @@ def weighted_average(x):
 # """
 #     log_message(f"\\nExecuting code for Panel_weighted_average:\\n{code}\\n")
 #     return execute_in_sandbox(code)
+# @mcp.tool()
+# def Panel_spread_portfolios(panel_id: str, weights_panel_id: str | int | float = '') -> str:
+#     """
+#     Construct spread portfolio weights as long the highest and short the lowest quantile stocks
+#     Args:
+#         panel_id (str): The id of the quantiles panel data set to construct spread portfolio weights for.
+#         weights_panel_id (str, optional): The id of the panel data set to use for weighting stocks in portfolios.
+#             If not provided, equal weighting will be used.
+#     Returns:
+#         str: the id of the created Panel of stock weights in the spread portfolio in JSON format
+#     """
+#     code = f"""
+# import json
+# from qrafti import Panel, spread_portfolios, panel_or_numeric
+# p1 = panel_or_numeric('{panel_id}', **{dates_})
+# p2 = panel_or_numeric('{weights_panel_id}', **{dates_})
+# p3 = p1.apply(spread_portfolios, None if p2 is None else p2).persist()
+# print(json.dumps({{'result_panel_id': p3.name, 'metadata': p3.info}}))
+# """
+#     log_message(f"\\nExecuting code for Panel_spread_portfolios:\\n{code}\\n")
+#     return execute_in_sandbox(code)
+
 
 #
 # Specialized Functions 
