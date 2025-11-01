@@ -5,21 +5,21 @@ from typing import Dict
 class PortfolioEvaluation:
     """Evaluate the performance of a portfolio DataFrame
         if portfolio.nlevels != 2:
-            raise ValueError("PortfolioEvaluation requires a PanelFrame with 2 index levels (date, stock)")
+            raise ValueError("PortfolioEvaluation requires a Panel with 2 index levels (date, stock)")
         PortfolioEvaluation(portfolio.frame)
     """
 
     def __init__(self, portfolio: pd.DataFrame):
         if portfolio.nlevels != 2:
-            raise ValueError("PortfolioEvaluation requires a PanelFrame with 2 index levels (date, stock)")
+            raise ValueError("PortfolioEvaluation requires a Panel with 2 index levels (date, stock)")
         self.portfolio = portfolio
 
-    def turnover(self, ret: PanelFrame) -> PanelFrame:
+    def turnover(self, ret: Panel) -> Panel:
         """Compute the turnover of the portfolio as the sum of absolute changes in weights.
         Arguments:
-            ret: PanelFrame of leading returns to compute drifted portfolio weights
+            ret: Panel of leading returns to compute drifted portfolio weights
         Returns:
-            PanelFrame of turnover values for each date
+            Panel of turnover values for each date
         """
         # shift both portfolio and returns by 1 period to align
         ret = ret.shift_dates(shift=1)
@@ -36,15 +36,15 @@ class PortfolioEvaluation:
         # compute turnover as sum of absolute changes in weights
         turnover = df.groupby(level=0).apply(lambda x: (x.iloc[:, 0] - x.iloc[:, -1]).abs().sum())
 
-        return PanelFrame().set_frame(turnover)
+        return Panel().set_frame(turnover)
     
     
-    def information_coefficient(self, ret: PanelFrame) -> PanelFrame:
+    def information_coefficient(self, ret: Panel) -> Panel:
         """Compute the Information Coefficient (IC) of the factor against the given returns.
         Arguments:
-            ret: PanelFrame of returns to compute IC against
+            ret: Panel of returns to compute IC against
         Returns:
-            PanelFrame of IC values for each date
+            Panel of IC values for each date
         """
         def ic_func(x):
             return x.iloc[:, 0].corr(x.iloc[:, 1])

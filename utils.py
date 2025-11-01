@@ -1,3 +1,86 @@
+# Use 'factor_agent_tool' for tasks involving characteristic preparation, factor construction, quantile sorting,
+# portfolio weighting, and any operations available from the Factor Portfolio Construction Agent such as
+# Panel_isin, Panel_winsorize, Panel_quantiles, Panel_spread_portfolios, and
+# get_variables_descriptions.
+# Use 'risk_agent_tool' for tasks involving generating portfolio returns and performance evaluation
+# plotting with Panel_plot, and access to get_variables_descriptions.
+
+# Factor Agent tool catalog:
+# - Panel_isin: filter a Panel to identifiers contained in a supplied list.
+# - Panel_winsorize: winsorize values using optional indicator Panel and percentile bounds.
+# - Panel_quantiles: assign quantile buckets using optional indicator Panel.
+# - Panel_spread_portfolios: build long-short spread portfolios with optional weights Panel.
+# - get_variables_descriptions: inspect available variables and cache identifiers via the metadata server.
+
+# Risk Agent tool catalog:
+# - Panel_matmul: compute matrix multiplication between two Panels.
+# - Panel_shift_dates: shift a Panel's dates forward or backward by an integer step.
+# - Panel_performance_evaluation: summarize factor performance statistics for a Panel of returns.
+# - Panel_plot: create plots for one or two Panels and return the saved image path.
+# - get_variables_descriptions: inspect available variables and cache identifiers via the metadata server.
+
+
+#You may call get_variables_descriptions when you need to understand available variables, but do not delegate
+# tasks yourself.
+# Describe the computation field with enough detail for the executing agent to know which tool call and
+# parameters are needed.
+
+
+
+import pandas as pd
+from qrafti import Panel, Calendar, DATE_NAME, STOCK_NAME
+def factor_generate(factor: Panel, lags: int, window: int, univ: Panel = None) -> Panel:
+    """Generate a factor Panel from rolling windows based on universe filter.
+    Arguments:
+        lags: Number of months to lag the factor values
+        window: Window size for rolling accumulation of factor values
+        univ: Optional Panel of universe filter
+    Returns:
+        Panel of generated factor values
+    """
+    assert factor.nlevels == 2, "Factor must have two index levels"
+    cal = Calendar()
+    factor_dates = factor.dates
+    start_date = cal.offset(factor_dates[0], offset=lags, strict=False)
+    end_date = cal.offset(factor_dates[-1], offset=lags, strict=False)
+    factor_final = []
+    for next_date in cal.dates_range(start_date, end_date):
+        # For each date, collect data from lagged window
+        start_window = cal.offset(next_date, offset = -(window + lags), strict=False)
+        end_window = cal.offset(next_date, offset = -lags, strict=False)
+        for curr_date in cal.dates_range(start_window, end_window):
+            if curr_date in factor_dates:
+                factor_df = factor.frame.xs(curr_date, level=0).reset_index()
+                factor_df[DATE_NAME] = next_date
+                factor_df['_date_'] = curr_date
+                factor_final.append(factor_df)
+
+    # sort by STOCK_NAME, DATE_NAME and _date_ and drop duplicates, keep last
+    factor_final = pd.concat(factor_final, axis=0)
+    factor_final = factor_final.sort_values(by=[STOCK_NAME, DATE_NAME, '_date_'])
+    factor_final = factor_final.drop_duplicates(subset=[STOCK_NAME, DATE_NAME], keep='last')
+    factor_final = factor_final.set_index([DATE_NAME, STOCK_NAME]).drop(columns=['_date_'])
+
+    # require index to be in univ.frame
+    factor_final = factor_final.join(univ.frame, how='inner', rsuffix='_univ').iloc[:, :1]
+    factor_final = Panel().set_frame(factor_final)
+    return factor_final
+
+
+def weighted_average(x):
+    """
+    Compute the weighted average of the first column, weighted by the last column.
+    Arguments:
+        x: DataFrame with at least two columns, first column is the data to be averaged,
+           last column is the weight for each row
+    Returns:
+        float: Weighted average of the first column
+    Usage:
+        panel_frame.apply(weighted_average, weights or 1, fill_value=0)
+    """
+    return (x.iloc[:, 0] * x.iloc[:, 1]).sum() / x.iloc[:, 1].sum()
+
+
 """
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -45,7 +128,7 @@ country_dict = {
 """
 TODO:
 - def TimeFrame.performance(): annualized return, volatility, sharpe ratio, max drawdown
-- def PanelFrame.turnover()
+- def Panel.turnover()
 - Download and check JKP factors
 """
 

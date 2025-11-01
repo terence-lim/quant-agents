@@ -31,55 +31,55 @@ port = 8000
 mcp = FastMCP("factor-server", host="0.0.0.0", port=port)
 
 # @mcp.tool()
-# def panelframe_weighted_average(panel_id: str, weights_panel_id: str = '') -> str:
+# def panel_weighted_average(panel_id: str, weights_panel_id: str = '') -> str:
 #     """Compute weighted average by date.
 #     Args:
 #         panel_id (str): The id of the panel data set to compute weighted average for.
 #         weights_panel_id (str, optional): The id of the weights panel data set to use for weighting the average.
 #             If not provided, equal weighting will be used.
 #     Returns:
-#         str: the id of the created PanelFrame in the cache in JSON format
+#         str: the id of the created panel in the cache in JSON format
 #     """
 #     code = f"""
 # import json
-# from qrafti import PanelFrame, weighted_average
-# p1 = PanelFrame('{panel_id}', **{dates})
-# p2 = PanelFrame('{weights_panel_id}', **{dates}) if '{weights_panel_id}' else None
+# from qrafti import Panel, weighted_average
+# p1 = Panel('{panel_id}', **{dates})
+# p2 = Panel('{weights_panel_id}', **{dates}) if '{weights_panel_id}' else None
 # p3 = p1.apply(weighted_average, None if p2 is None else p2).persist()
 # print(json.dumps({{'result_panel_id': p3.name, 'metadata': p3.info}}))
 # """
-#     log_message(f"\\nExecuting code for panelframe_weighted_average:\\n{code}\\n")
+#     log_message(f"\\nExecuting code for Panel_weighted_average:\\n{code}\\n")
 #     return execute_in_sandbox(code)
 
 #
 # Specialized Functions 
 #
 @mcp.tool()
-def panelframe_isin(panel_id: str, values: list) -> str:
+def Panel_isin(panel_id: str, values: list) -> str:
     """
-    Create a PanelFrame that filters the rows of the given panel data 
+    Create a Panel that filters the rows of the given panel data 
     to indicate those with values in the provided list.
     Args:
         panel_id (str): The id of the panel data to filter.
         values (list): A list of values to filter the panel data by.
     Returns:
-        str: the id of the created PanelFrame in the cache in JSON format
+        str: the id of the created Panel in the cache in JSON format
     """
     code = f"""
 import json
-from qrafti import PanelFrame
+from qrafti import Panel
 import pandas as pd
-p1 = PanelFrame('{panel_id}', **{dates})
+p1 = Panel('{panel_id}', **{dates})
 p2 = p1.apply(pd.DataFrame.isin, values={values}).persist()
 print(json.dumps({{'result_panel_id': p2.name, 'metadata': p2.info}}))
 """
-    log_message(f"\nExecuting code for panelframe_isin:\n{code}\n")
+    log_message(f"\nExecuting code for Panel_isin:\n{code}\n")
     return execute_in_sandbox(code)  
     
 @mcp.tool()
-def panelframe_winsorize(panel_id: str, reference_panel_id: str = '', lower: float = 0.0, upper: float = 1.0) -> str:
+def Panel_winsorize(panel_id: str, reference_panel_id: str = '', lower: float = 0.0, upper: float = 1.0) -> str:
     """
-    Create a PanelFrame that winsorizes the values of the given panel data.
+    Create a Panel that winsorizes the values of the given panel data.
     Args:
         panel_id (str): The id of the panel data set to winsorize.
         upper (float): The upper percentile to winsorize to (between 0 and 1).
@@ -88,24 +88,24 @@ def panelframe_winsorize(panel_id: str, reference_panel_id: str = '', lower: flo
             rows of the panel data set to use for computing the upper and lower bounds.
             If not provided, the winsorization bounds will be computed based on all the values in the panel_id data set.
     Returns:
-        str: the id of the created PanelFrame in the cache in JSON format
+        str: the id of the created Panel in the cache in JSON format
     """
     code = f"""
 import json
-from qrafti import PanelFrame, winsorize
-p1 = PanelFrame('{panel_id}', **{dates})
-p2 = PanelFrame('{reference_panel_id}', **{dates}) if '{reference_panel_id}' else None
+from qrafti import Panel, winsorize
+p1 = Panel('{panel_id}', **{dates})
+p2 = Panel('{reference_panel_id}', **{dates}) if '{reference_panel_id}' else None
 p3 = p1.apply(winsorize, None if p2 is None else p2, lower={lower}, upper={upper}).persist()
 print(json.dumps({{'result_panel_id': p3.name, 'metadata': p3.info}}))
 """
-    log_message(f"\\nExecuting code for panelframe_winsorize:\\n{code}\\n")
+    log_message(f"\\nExecuting code for Panel_winsorize:\\n{code}\\n")
     return execute_in_sandbox(code)
 
 
 @mcp.tool()
-def panelframe_quantiles(panel_id: str, num: int, reference_panel_id: str = '') -> str:
+def Panel_quantiles(panel_id: str, num: int, reference_panel_id: str = '') -> str:
     """
-    Create a PanelFrame that computes the quantiles of the given panel data.
+    Create a Panel that computes the quantiles of the given panel data.
     Args:
         panel_id (str): The id of the panel data set to compute quantiles for.
         num (int): The number of quantiles to compute.
@@ -113,22 +113,22 @@ def panelframe_quantiles(panel_id: str, num: int, reference_panel_id: str = '') 
             rows of the panel data set to use for computing the quantile breakpoints.
             If not provided, the quantiles will be computed based on all the values in the panel_id data set.
     Returns:
-        str: the id of the created PanelFrame in the cache in json format
+        str: the id of the created Panel in the cache in json format
     """
     code = f"""
 import json
-from qrafti import PanelFrame, digitize
-p1 = PanelFrame('{panel_id}', **{dates})
-p2 = PanelFrame('{reference_panel_id}', **{dates}) if '{reference_panel_id}' else None
+from qrafti import Panel, digitize
+p1 = Panel('{panel_id}', **{dates})
+p2 = Panel('{reference_panel_id}', **{dates}) if '{reference_panel_id}' else None
 p3 = p1.apply(digitize, None if p2 is None else p2, cuts={num}).persist()
 print(json.dumps({{'result_panel_id': p3.name, 'metadata': p3.info}}))
 """
-    log_message(f"\nExecuting code for panelframe_quantiles:\n{code}\n")
+    log_message(f"\nExecuting code for Panel_quantiles:\n{code}\n")
     return execute_in_sandbox(code)  
 
 
 @mcp.tool()
-def panelframe_spread_portfolios(panel_id: str, weights_panel_id: str = '') -> str:
+def Panel_spread_portfolios(panel_id: str, weights_panel_id: str = '') -> str:
     """
     Construct long-short spread portfolios of highest and lowest quantiles by date
     Args:
@@ -136,17 +136,17 @@ def panelframe_spread_portfolios(panel_id: str, weights_panel_id: str = '') -> s
         weights_panel_id (str, optional): The id of the weights panel data set to use for weighting the portfolios.
             If not provided, equal weighting will be used.
     Returns:
-        str: the id of the created PanelFrame in JSON format
+        str: the id of the created Panel in JSON format
     """
     code = f"""
 import json
-from qrafti import PanelFrame, spread_portfolios
-p1 = PanelFrame('{panel_id}', **{dates})
-p2 = PanelFrame('{weights_panel_id}', **{dates}) if '{weights_panel_id}' else None
+from qrafti import Panel, spread_portfolios
+p1 = Panel('{panel_id}', **{dates})
+p2 = Panel('{weights_panel_id}', **{dates}) if '{weights_panel_id}' else None
 p3 = p1.apply(spread_portfolios, None if p2 is None else p2).persist()
 print(json.dumps({{'result_panel_id': p3.name, 'metadata': p3.info}}))
 """
-    log_message(f"\\nExecuting code for panelframe_spread_portfolios:\\n{code}\\n")
+    log_message(f"\\nExecuting code for Panel_spread_portfolios:\\n{code}\\n")
     return execute_in_sandbox(code)
 
 

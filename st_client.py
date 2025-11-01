@@ -64,7 +64,7 @@ To execute the plan, you should sequentially execute each step by calling the ap
 For each step in the plan, delegate only that step and its description to the specialized agent specified in the 'agent tool' field of the step; 
 then delegate the next step to the specialized agent specified in the next step, and so on.
 Do not perform any steps that were assigned to other agent tools.
-You may use the get_variables_descriptions tool to look for PanelFrame ids of stocks data.
+You may use the get_variables_descriptions tool to look for Panel ids of stocks data.
 Do not use or assume use any data, characteristics or definitions that
 you were not given or you did not generate.
 Explain the steps you took, the planner output you received, and the agent tools you used for each step.
@@ -92,41 +92,15 @@ You may call get_variables_descriptions when you need to understand available va
 The 'agent tool' value must be either 'factor_agent_tool' or 'risk_agent_tool', matching the agent that will
 perform the step.
 
-Factor Agent tool catalog:
-- panelframe_isin: filter a PanelFrame to identifiers contained in a supplied list.
-- panelframe_winsorize: winsorize values using optional indicator PanelFrame and percentile bounds.
-- panelframe_quantiles: assign quantile buckets using optional indicator PanelFrame.
-- panelframe_spread_portfolios: build long-short spread portfolios with optional weights PanelFrame.
-- get_variables_descriptions: inspect available variables and cache identifiers via the metadata server.
-
-Risk Agent tool catalog:
-- panelframe_matmul: compute matrix multiplication (e.g., weights @ returns) between two PanelFrames.
-- panelframe_shift_dates: shift a PanelFrame's dates forward or backward by an integer step.
-- panelframe_performance_evaluation: summarize factor performance statistics for a PanelFrame of returns.
-- panelframe_plot: create plots for one or two PanelFrames and return the saved image path.
-- get_variables_descriptions: inspect available variables and cache identifiers via the metadata server.
-
 Use 'factor_agent_tool' for tasks involving characteristic preparation, factor construction, quantile sorting,
 portfolio weighting, and any computation that relies on the factor agent's tools.
-Use 'risk_agent_tool' for tasks involving portfolio return generation, date alignment, risk reporting,
-visualization, and any computation that relies on the risk agent's tools.
-Use 'factor_agent_tool' for tasks involving characteristic preparation, factor construction, quantile sorting,
-portfolio weighting, and any operations available from the Factor Portfolio Construction Agent such as
-panelframe_isin, panelframe_winsorize, panelframe_quantiles, panelframe_spread_portfolios, and
-get_variables_descriptions.
-Use 'risk_agent_tool' for tasks involving portfolio return generation, matrix operations like panelframe_matmul,
-date alignment with panelframe_shift_dates, performance evaluation via panelframe_performance_evaluation,
-plotting with panelframe_plot, and access to get_variables_descriptions.
+Use 'risk_agent_tool' for tasks involving portfolio or factor return generation and evaluation, risk reporting,
+plotting, and any computation that relies on the risk agent's tools.
 
 """.strip(),
     model_settings={'temperature': 0.0},
     toolsets=[metadata_server]
 )
-
-#You may call get_variables_descriptions when you need to understand available variables, but do not delegate
-# tasks yourself.
-# Describe the computation field with enough detail for the executing agent to know which tool call and
-# parameters are needed.
 
 
 # Create the agent and attach MCP server
@@ -135,13 +109,13 @@ factor_agent = Agent(
     model=model,
     system_prompt="""
 Use the tools provided to perform factor portfolio construction tasks
-on the PanelFrame data.
-Be sure to include supporting reference PanelFrames where required in your tool calls to ensure
+on the Panel data.
+Be sure to include supporting reference Panels where required in your tool calls to ensure
 all information in the query is captured accurately.
 Do not perform any steps that were assigned to other agent tools.
 Do not use or assume use any data, characteristics or definitions that
 you were not given or you did not generate. 
-You may use the get_variables_descriptions tool to look for PanelFrame ids of stocks data.
+You may use the get_variables_descriptions tool to look for Panel ids of stocks data.
 Explain the steps you took and the tools you used.
 """.strip(),
     toolsets=[factor_server, metadata_server],
@@ -153,13 +127,13 @@ risk_agent = Agent(
     model=model, 
     system_prompt="""
 Use the tools provided to perform factor returns performance and risk analysis tasks
-on the PanelFrame data.
-Be sure to include supporting reference PanelFrames where required in your tool calls to ensure
+on the Panel data.
+Be sure to include supporting reference Panels where required in your tool calls to ensure
 all information in the query is captured accurately.
 Do not perform any steps that were assigned to other agent tools.
 Do not use or assume use any data, characteristics or definitions that
 you were not given or you did not generate.
-You may use the get_variables_descriptions tool to look for PanelFrame ids of stocks data.
+You may use the get_variables_descriptions tool to look for Panel ids of stocks data.
 Explain the steps you took and the tools you used.
 """.strip(),
     toolsets=[risk_server, metadata_server],

@@ -15,7 +15,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import warnings
 
-from qrafti import STOCK_NAME, DATE_NAME, PanelFrame, DATA_LAKE, Calendar
+from qrafti import STOCK_NAME, DATE_NAME, Panel, DATA_LAKE, Calendar
 
 PSTAT_DATA = Path('/home/terence/Downloads/scratch/2024/PSTAT')
 CRSP_DATA = Path('/home/terence/Downloads/scratch/2024/CRSP')
@@ -93,7 +93,7 @@ ret_type = 'ret_vw_cap'
 #      df = benchmarks_df[[bench]].dropna()
 #      col = bench + '_' + ret_type
 #      df.columns = [col]
-#      PanelFrame(col).set_frame(df).persist(col)
+#      Panel(col).set_frame(df).persist(col)
 
 
 def load_panel_csv(filename: str | Path, 
@@ -103,7 +103,7 @@ def load_panel_csv(filename: str | Path,
                    append: bool,
                    filter: Dict ={},
                    keep: List[str] = []) -> None:
-    """Load each column of CSV file to its own PanelFrame."""
+    """Load each column of CSV file to its own Panel."""
 #if True:
 #    stock_name = 'gvkey'
 #    date_name = 'datadate'
@@ -137,7 +137,7 @@ def load_panel_csv(filename: str | Path,
 
     for i, col in tqdm(enumerate(keep), total=len(keep)):
         df = df_data[[col]].dropna().convert_dtypes()
-        panel = PanelFrame(col)
+        panel = Panel(col)
         print(panel.name, len(panel), panel.nlevels)
         panel = panel.set_frame(df, append=append).persist(col)
         print(panel.name, len(panel), panel.nlevels)
@@ -148,7 +148,7 @@ def load_csv(filename: str | Path,
              date_name: str,
              sep: str,
              keep: List[str] = []) -> None:
-    """Load each column of CSV file to its own PanelFrame."""
+    """Load each column of CSV file to its own Panel."""
 # if True:
 #     filename = DATA_LAKE / 'FF.csv'
 #     date_name = 'Date'
@@ -170,7 +170,7 @@ def load_csv(filename: str | Path,
         df = df_data[[date_name, col]].dropna().convert_dtypes()
         df.set_index(date_name, inplace=True)
         df.index.name = DATE_NAME
-        panel = PanelFrame(col)
+        panel = Panel(col)
         print(panel.name, len(panel), panel.nlevels)
         panel = panel.set_frame(df, append=True).persist(col)
         print(panel.name, len(panel), panel.nlevels)
@@ -195,7 +195,7 @@ def load_crsp(filename: str | Path,
               date: str,
               sep: str,
               keep: List[str] = []) -> None:
-    """Load each column of CSV file to its own PanelFrame."""
+    """Load each column of CSV file to its own Panel."""
 
 #    filename = DATA_LAKE / 'crsp.txt.gz'
 #    date = 'date'
@@ -244,7 +244,7 @@ def load_crsp(filename: str | Path,
             df = df[df[col] > 0].dropna()
         df.set_index([date, 'PERMNO'], inplace=True)
         df.index.names = (DATE_NAME, STOCK_NAME)
-        panel = PanelFrame(col).set_frame(df, append=False).persist(col)
+        panel = Panel(col).set_frame(df, append=False).persist(col)
         print(panel.name, len(panel), panel.nlevels)
 
     # Identify universe of stocks, and assign into size deciles based on stocks with exchcd == 1 (NYSE)
@@ -268,7 +268,7 @@ def load_crsp(filename: str | Path,
     df = df.groupby(level=0).apply(deciles).rename('SIZE_DECILE')
     while df.index.nlevels > 2:
         df = df.reset_index(level=0, drop=True)
-    panel = PanelFrame().set_frame(df, append=False).persist('SIZE_DECILE')
+    panel = Panel().set_frame(df, append=False).persist('SIZE_DECILE')
     print(panel.name, len(panel), panel.nlevels)
     
 
@@ -277,7 +277,6 @@ def load_crsp(filename: str | Path,
 #     date_name = 'Date'
 #     sep = '\t'
 #     keep=['Mkt-RF', 'HML']
-
 
 if __name__ == '__main__':
 
