@@ -98,24 +98,54 @@ class DataCache:
 #
 # TO DO: as RAG
 #
-def load_variables(filename = 'variables.txt', 
-                   data_path: Path = DATA_LAKE) -> pd.DataFrame:
-    """Read names, types and descriptions from the variables.txt file"""
+# 1. JKP variables that are stems of factor-returns
+# 2. all PSTAT variables
+# 3. all CRSP variables with descriptions like JKP or my own
+# 4. => RAG by bow: at least max(30, sqrt(len(variables)))
+# should inject "Compustat Annual" for all pstat variables -> "Source: Compustat Annual" etc
 
-    names, types, descriptions = [], [], []
-    with open(Path(data_path) / filename, 'r', encoding='utf-8') as f:
-        for line in f:
-            if line.strip().lower().startswith('name '):
-                continue  # skip header
-            # Use regex to extract: name type length description
-            match = re.match(r'^(\S+)\s+(\S+)\s+\S+\s+(.*)', line.strip())
-            if match:
-                name, typ, desc = match.group(1), match.group(2), match.group(3)
-                names.append(name)
-                types.append(typ)
-                descriptions.append(desc)
-    df = pd.DataFrame({'Type': types, 'Description': descriptions}, index=names)
-    df.index.name = 'Name'
+def load_variables(filenames = ['PSTAT.csv', 'JKP.csv'], 
+                   data_path: Path = DATA_LAKE,
+                   crsp: bool = True) -> pd.DataFrame:
+    """Read names, types and descriptions file"""
+    keep_list = {'RET', 'RETX', 'PRC', 'VOL', 'SICCD', 'pstkrv','pstkl','pstk','seq','txditc','ret_12_1'}
+    if crsp:
+        keep_list |= {'CAPCO', 'CAP', 'SIZE_DECILE', 'SHRCD', 'EXCHCD', 'SIZE_DECILE'}
+    else:  # should be different length, to trigger recreation
+        keep_list |= {'me','me_company','size_grp','crsp_shrcd','crsp_exchcd'}
+
+    try:
+        df = pd.read_csv(data_path / 'characteristics.csv', index_col=0, sep='\t')
+        assert len(df) == len(keep_list), "characteristics.csv does not have expected number of variables"
+    except:
+        suf = ' [Source: CRSP Monthly]'
+        df = pd.DataFrame(index=['CAPCO', 'CAP', 'PRC', 'RET', 'RETX', 'VOL', 'SHRCD', 'EXCHCD', 'SICCD', 'SIZE_DECILE'],
+                          data={'Type': ['float']*10,
+                                'Description': ['Market Capitalization of Company' + suf,
+                                                'Market Value of Common Equity' + suf,
+                                                'Closing Stock Price' + suf,
+                                                'Total Stock Return' + suf,
+                                                'Stock Price Return without dividends' + suf,
+                                                'Trading Volume' + suf,
+                                                'Share Code ([10, 11]=Domestic US Common Stocks)' + suf,
+                                                'Exchange Code (1=NYSE, 2=AMEX, 3=NASDAQ)' + suf,
+                                                'Standard Industrial Classification Code' + suf,
+                                                'Size Decile Classification (1=Largest, 10=Smallest)' + suf]})
+        df_list = [df]
+        for filename in filenames:
+            df = pd.read_csv(data_path / filename, sep='\t', index_col=0, header=0)
+            df.columns = ['Type', 'Description']
+            # remove prefix substring between parentheses in Description
+            df['Description'] = df['Description'].apply(lambda x: re.sub(r'^\(.*?\)\s*', '', x))
+            if filename.lower().startswith('pstat'):
+                df['Description'] = df['Description'] + ' (Source: Compustat Annual)'
+            df_list.append(df)
+        df = pd.concat(df_list, axis=0)
+        df.index.name = 'Name'
+    
+        # keep only rows with index value in keep_list
+        df = df[df.index.isin(keep_list)]
+        df.to_csv(data_path / 'characteristics.csv', sep='\t')
     return df
 
 #
@@ -232,6 +262,9 @@ class Panel:
     def __len__(self) -> int:
         """Return the number of data items in this Panel."""
         return 0 if self._frame is None else len(self._frame)
+    
+    def __str__(self) -> str:
+        return json.dumps({'results_panel_id': self.name, 'meta': self.info}, indent=2)
 
     @property
     def frame(self) -> pd.DataFrame:
@@ -252,7 +285,7 @@ class Panel:
         if self.nlevels == 2:
             info['max_stocks_per_date'] = int(self.frame.groupby(level=0).size().max())
             info['min_stocks_per_date'] = int(self.frame.groupby(level=0).size().min())
-        info['memory_usage_bytes'] = int(self.frame.memory_usage(deep=True).sum())
+        info['memory_usage_bytes'] = 0 if self.nlevels < 0 else int(self.frame.memory_usage(deep=True).sum())
         return info
 
     @property
@@ -325,18 +358,22 @@ class Panel:
             data = fill_value if self._frame is None else self.frame   # value for self Panel
             df = pd.DataFrame(index=other.frame.index, data=data, columns=['self'])
 
-        if isinstance(other, Panel) and other.nlevels >= 0:  # other is a Panel
+        if isinstance(other, Panel):  # other is a Panel
             if other.nlevels > 0:
                 # other is also a multi-index Panel: join on index levels
                 other_df = other.frame
                 assert df.index.nlevels == other_df.index.nlevels, "Cannot join Panels with different index levels"
                 df = df.join(other_df, how=how, rsuffix='_').fillna(fill_value)
-            else:
-                # other is a scalar Panel: add as a column with same value
+            elif other.nlevels == 0:
+                # other is a scalar Panel: add as a column with same scalar value
                 df['other'] = other.frame
-        else:  # other is a scalar or None
-            if other is not None:    # MAY REMOVE THIS LINE
-                df['other'] =  other
+            else:
+                # other is None: add as column with fill-value
+                df['other'] = fill_value
+        elif other is None:
+            df['other'] = fill_value
+        else:
+            df['other'] =  other
         if any(is_float_dtype(dtype) for dtype in df.dtypes):
             return df.astype("Float64")
         else:
@@ -363,7 +400,7 @@ class Panel:
         self.name = name
         return self
     
-    def set_frame(self, frame: pd.DataFrame, append=True) -> 'Panel':
+    def set_frame(self, frame: pd.DataFrame, append=False) -> 'Panel':
         """Helper to set or append a DataFrame to this Panel."""
 
         def _scalar_as_frame(frame: Any, col: str = '') -> pd.DataFrame:
@@ -383,26 +420,32 @@ class Panel:
                 return True
             return False
 
+        # Convert input Series to DataFrame for processing
         if isinstance(frame, pd.Series):
             frame = frame.to_frame()
-        if is_scalar(frame):
-            self._frame = _scalar_as_frame(frame)
-        else:
-            if isinstance(frame, pd.DataFrame):
-                if _frame_is_scalar(frame):
-                    self._frame = _scalar_as_frame(frame)
-                elif append and self.frame is not None:
-                    old_frame = self.frame
-                    frame.columns = old_frame.columns # force new column names to match existing
 
-                    # drop duplicates based on index, keep the last occurrence
-                    self._frame = pd.concat([old_frame, frame], axis=0).sort_index(level=range(frame.index.nlevels))
-                    self._frame = self.frame[~self.frame.index.duplicated(keep='last')]
-                else:
-                    self._frame = frame.sort_index(level=range(frame.index.nlevels))
-                    self._frame.index.names = [DATE_NAME, STOCK_NAME][:frame.index.nlevels] # ensure index names
+        if frame is None:    # None frame -> None
+            self._frame = None
+        elif is_scalar(frame):  # scalar value -> scalar-like DataFrame
+            self._frame = _scalar_as_frame(frame)
+        elif isinstance(frame, pd.DataFrame):
+            if frame.empty:     # empty frame -> None
+                self._frame = None
+            elif _frame_is_scalar(frame):  # scalar-like DataFrame 
+                self._frame = _scalar_as_frame(frame)
+            elif append and self.frame is not None:   # append new values to existing
+                old_frame = self.frame
+                frame.columns = old_frame.columns # force new column names to match existing
+
+                # drop duplicates based on index, keep the last occurrence
+                self._frame = pd.concat([old_frame, frame], axis=0).sort_index(level=range(frame.index.nlevels))
+                self._frame = self.frame[~self.frame.index.duplicated(keep='last')]
             else:
-                assert False, "Frame must be a pandas DataFrame or scalar"
+                self._frame = frame.sort_index(level=range(frame.index.nlevels))
+                self._frame = self.frame[~self.frame.index.duplicated(keep='last')]
+                self._frame.index.names = [DATE_NAME, STOCK_NAME][:frame.index.nlevels] # ensure index names
+        else:
+            assert False, "Frame must be a pandas DataFrame or scalar"
         return self
 
     def astype(self, dtype) -> 'Panel':
@@ -463,22 +506,22 @@ class Panel:
     
     def __mul__(self, other: 'Panel') -> 'Panel':
         """Multiply values of this Panel with other"""
-        df, df_other = self._operands(other, fill_value=1, how='outer')
+        df, df_other = self._operands(other, fill_value=1, how='inner')
         return Panel().set_frame(df * df_other)
     
     def __rmul__(self, other: 'Panel') -> 'Panel':
         """Multiply values of this Panel with other"""
-        df, df_other = self._operands(other, fill_value=1, how='outer')
+        df, df_other = self._operands(other, fill_value=1, how='inner')
         return Panel().set_frame(df_other * df)
     
     def __truediv__(self, other: 'Panel') -> 'Panel':
         """Divide values of this Panel with other"""
-        df, df_other = self._operands(other, fill_value=1, how='outer')
+        df, df_other = self._operands(other, fill_value=1, how='inner')
         return Panel().set_frame(df / df_other)
     
     def __rtruediv__(self, other: 'Panel') -> 'Panel':
         """Divide values of this Panel with other"""
-        df, df_other = self._operands(other, fill_value=1, how='outer')
+        df, df_other = self._operands(other, fill_value=1, how='inner')
         return Panel().set_frame(df_other / df)
 
     def __eq__(self, other: 'Panel') -> 'Panel':
@@ -636,14 +679,13 @@ class Panel:
         return out_panel
 
     def filter(self, min_value: float = None, max_value: float = None, isin: List = None,
-               start_date: str = None, end_date: str = None, dates: List[str] = None, 
+               start_date: str = None, end_date: str = None, 
                dropna: bool = False, mask: 'Panel' = None, index: 'Panel' = None,
                stocks: List[int] = None, min_stocks: int = None) -> 'Panel':
         """Filter the values of this Panel based on date, stock, and value criteria.
         Arguments:
             start_date: Optional start date to filter the DataFrame (inclusive)
             end_date: Optional end date to filter the DataFrame (inclusive)
-            dates: Optional list of dates to filter the DataFrame
             stocks: Optional list of stocks to filter the DataFrame
             min_stocks: Optional minimum number of stocks per date to keep the date
             min_value: Optional minimum value to keep the row
@@ -663,8 +705,6 @@ class Panel:
             df = df[df.index.get_level_values(0) >= start_date]
         if end_date:
             df = df[df.index.get_level_values(0) <= end_date]
-        if dates:
-            df = df[df.index.get_level_values(0).isin(dates)]
         if stocks:
             df = df[df.index.get_level_values(1).isin(stocks)]
         if min_value is not None:
@@ -693,8 +733,7 @@ class Panel:
             counts = df.groupby(level=0).size()
             valid_dates = counts[counts >= min_stocks].index
             df = df[df.index.get_level_values(0).isin(valid_dates)]
-        out_panel._frame = df
-        return out_panel
+        return out_panel.set_frame(df, append=False)
 
     def plot(self, other_panel: 'Panel' = None, **kwargs):
         """Plot the values of this Panel.
@@ -839,38 +878,6 @@ def cumcount(x) -> pd.Series:
 #
 # Characteristics Functions
 #
-def characteristics_snapshots(characteristics: Panel, month: List | int = []) -> Panel:
-    """Extract snapshot of the characteristics values at a specific months
-    Arguments:
-        characteristics: Panel of characteristics values
-        month: List of months (1-12) to extract snapshots for, if empty, extract for all months
-    Returns:
-        Panel of characteristics values at the specified date, forward filled from previous dates
-    """
-    assert characteristics.nlevels == 2, "characteristics must have two index levels"
-
-    characteristics_dates = characteristics.dates
-    prev_date = characteristics_dates[0]
-    cal = Calendar(start_date=characteristics_dates[0], end_date=characteristics_dates[-1])
-    snapshot_df = []
-    for next_date in cal.dates_range(cal.start_date, cal.end_date):
-        if not month or cal.ismonth(next_date, month):
-            for curr_date in cal.dates_range(prev_date, next_date):
-                if curr_date in characteristics_dates:
-                    characteristics_df = characteristics.frame.xs(curr_date, level=0).reset_index()
-                    characteristics_df[DATE_NAME] = next_date
-                    characteristics_df['_date_'] = curr_date
-                    snapshot_df.append(characteristics_df)
-            prev_date = cal.offset(next_date, 1, strict=True)
-
-    # sort by STOCK_NAME, DATE_NAME and _date_ and drop duplicates, keep last
-    snapshot_final = pd.concat(snapshot_df, axis=0)
-    snapshot_final = snapshot_final.sort_values(by=[STOCK_NAME, DATE_NAME, '_date_'])
-    snapshot_final = snapshot_final.drop_duplicates(subset=[STOCK_NAME, DATE_NAME], keep='last')
-    snapshot_final = snapshot_final.set_index([DATE_NAME, STOCK_NAME]).drop(columns=['_date_'])
-    snapshot_panel = Panel().set_frame(snapshot_final)
-    return snapshot_panel
-
 def characteristics_fill(*panels, replace: List = []) -> Panel:
     """Fill with values from other Panels in order
 
@@ -892,6 +899,39 @@ def characteristics_fill(*panels, replace: List = []) -> Panel:
     for panel in panels:
         out_panel = out_panel.apply(replace_helper, panel, how='outer', fill_value=np.nan, replace=replace)
     return out_panel
+
+def characteristics_downsample(characteristics: Panel, month: List | int = []) -> Panel:
+    """Downsamples characteristics values at lower frequency of a specific months
+    Arguments:
+        characteristics: Panel of characteristics values
+        month: List of months (1-12) to extract downsamples for, if empty, extract for all months
+    Returns:
+        Panel of characteristics values at the specified date, forward filled from previous dates
+    """
+    assert characteristics.nlevels == 2, "characteristics must have two index levels"
+
+    characteristics_dates = characteristics.dates
+    prev_date = characteristics_dates[0]
+    cal = Calendar(start_date=characteristics_dates[0], end_date=characteristics_dates[-1])
+    samples_df = []
+    for next_date in cal.dates_range(cal.start_date, cal.end_date):
+        if not month or cal.ismonth(next_date, month):
+            for curr_date in cal.dates_range(prev_date, next_date):
+                if curr_date in characteristics_dates:
+                    characteristics_df = characteristics.frame.xs(curr_date, level=0).reset_index()
+                    characteristics_df[DATE_NAME] = next_date
+                    characteristics_df['_date_'] = curr_date
+                    samples_df.append(characteristics_df)
+            prev_date = cal.offset(next_date, 1, strict=True)
+
+    # sort by STOCK_NAME, DATE_NAME and _date_ and drop duplicates, keep last
+    samples_final = pd.concat(samples_df, axis=0)
+    samples_final = samples_final.sort_values(by=[STOCK_NAME, DATE_NAME, '_date_'])
+    samples_final = samples_final.drop_duplicates(subset=[STOCK_NAME, DATE_NAME], keep='last')
+    samples_final = samples_final.set_index([DATE_NAME, STOCK_NAME]).drop(columns=['_date_'])
+    samples_panel = Panel().set_frame(samples_final)
+    return samples_panel
+
 
 #
 # Portfolio Functions
@@ -927,7 +967,7 @@ def portfolio_impute(port_weights: Panel, retx: Panel = None,
 
     prev_weights = None
     drifted_weights = []
-    for date in tqdm(all_dates):
+    for date in tqdm(all_dates, desc='portfolio_impute'):
         if (drifted or date not in portfolio_dates) and prev_weights is not None:
             # forward drift previous weights if any
             if (retx is not None and date in retx.frame.index.get_level_values(0)):
@@ -992,13 +1032,110 @@ def portfolio_evaluation(port_returns: Panel) -> Dict[str, float]:
     """
     return {} if port_returns.nlevels != 1 else PortfolioEvaluation(port_returns.frame).summary()
 
-    
+def show(x):
+    if isinstance(x, int):
+        x = Panel(f'_{x}')
+    elif isinstance(x, str):
+        if not x.startswith('_') and x.isdigit():
+            x = '_' + x
+        x = Panel(x)
+    print(str(x))
+    print(x.frame)
+
 if __name__ == "__main__":
     tic = time.time()
 
     print(str(datetime.now()))
 
-    # Unit Test 6: pipeline
+#    a = Panel('HML')
+#    b = Panel('HML')
+#    c = a - b
+
+#    raise Exception
+
+#if False:    # DO NOT DELETE -- FF
+    # Get Universe
+#    universe = Panel('SIZE_DECILE')
+
+    dates = dict(start_date='1970-01-01', end_date='2024-12-31') #'2020-01-01'
+    dates = dict(start_date='2020-01-01', end_date='2024-12-31') #
+    _dates = {}   # require all dates in case of aging
+    _dates = dates
+
+    # Compute Book Value
+    pstkrv = Panel('pstkrv', **_dates)
+    pstkl = Panel('pstkl', **_dates)
+    pstk = Panel('pstk', **_dates)
+    seq = Panel('seq', **_dates)  # total shareholders' equity
+    preferred_stock = characteristics_fill(pstkrv, pstkl, pstk, replace=0)
+#    preferred_stock = pstkrv | pstkl | pstk
+    txditc = Panel('txditc', **_dates).filter(end_date='1993-12-31')  # deferred taxes and investment tax credit
+
+    book_value = seq - preferred_stock + txditc  # less preferred stock, add deferred tax before 1993
+
+#    age = seq.trend(cumcount)  # at least 2 years of age
+#    book_value = book_value.filter(min_value=0, dropna=True, mask=(age >= 2), **dates)
+
+    # Compute Book to Market at December samples
+    month = 12  # Decembers
+    book_samples = characteristics_downsample(book_value, month=month)
+    print(f"Downsampled Panel info: {frame_info(book_samples.frame)}")
+    company_value = Panel('CAPCO', **dates)
+#    company_value = company_value.filter(index=universe)
+    company_value = characteristics_downsample(company_value, month=month)
+
+    # Lag Book to Market, restrict to universe and form terciles based on NYSE stocks
+    lags = 6
+    book_market = (book_samples / company_value).shift(lags)
+#    book_market = book_market.filter(index=universe)
+
+    # Form size and bm quantiles based on NYSE stocks
+    nyse = (Panel('EXCHCD', **dates) == 1)
+#    nyse = nyse.filter(index=universe)
+    bm_quantiles = book_market.apply(digitize, reference=nyse, cuts=[0.3, 0.7])
+    size_quantiles = Panel('CAP', **dates)
+#    size_quantiles = size_quantiles.filter(index=universe)
+    size_quantiles = size_quantiles.apply(digitize, nyse, cuts=2)
+#    size_quantiles = (Panel('SIZE_DECILE') > 5) + 1
+
+    # Form intersection
+    market_value = Panel('CAP', **dates)
+    BL = market_value.filter(mask=(size_quantiles==2) & (bm_quantiles == 1)).apply(portfolio_weights)
+    BH = market_value.filter(mask=(size_quantiles==2) & (bm_quantiles == 3)).apply(portfolio_weights)
+    SL = market_value.filter(mask=(size_quantiles==1) & (bm_quantiles == 1)).apply(portfolio_weights)
+    SH = market_value.filter(mask=(size_quantiles==1) & (bm_quantiles == 3)).apply(portfolio_weights)
+    composite_portfolio = (SH - SL + BH - BL) / 2
+
+#    drifted = portfolio_impute(composite_portfolio, drifted=True)
+#    turnover = composite_portfolio - drifted
+#    print(f"Average Turnover: {turnover.apply(np.abs).apply(np.sum, axis=0).apply(np.mean).frame}")
+
+    composite_returns = portfolio_returns(composite_portfolio)
+    summary = portfolio_evaluation(composite_returns)
+    print(f"Composite Portfolio Summary: {summary}")
+
+#    composite_returns = composite_returns.filter(start_date='1972-01-01')
+    bench = Panel('HML', **dates).filter(index=composite_returns)
+    print(portfolio_evaluation(bench))
+    composite_returns.plot(bench, kind='scatter', title='Composite BM vs HML')
+
+    # sort by greatest difference between bench and composite returns
+    diff = (composite_returns - bench).frame.sort_values(by=0, ascending=False)
+    print(diff)
+    print(f'Mean absolute difference: {diff.abs().mean().item():.4f}, '
+          f'{np.corrcoef(composite_returns.frame.values, bench.frame.values, rowvar=False)[0,1].item():.4f}, '
+          f'{composite_returns.frame.abs().mean().item():.4f}, {bench.frame.abs().mean().item():.4f}')
+
+    toc = time.time()
+    print(f"Total elapsed time: {toc - tic:.2f} seconds")
+    raise Exception
+
+if False:  # DO NOT DELETE -- JKP
+    df = load_variables()
+    print(df)
+
+    raise Exception
+
     ret = 'ret_vw_cap'
     factor = 'ret_12_1'
     dates = dict(start_date='1975-01-01', end_date='2024-12-31')
@@ -1032,118 +1169,6 @@ if __name__ == "__main__":
     low_ret = portfolio_returns(low_pf)
     diff_ret = high_ret - low_ret
     diff_ret.plot(bench, kind='scatter')
-
-if False:
-    # Get Universe
-    dates = dict(start_date='1970-01-01', end_date='2024-12-31') #'2020-01-01'
-    dates = dict(start_date='2020-01-01', end_date='2024-12-31') #
-    nyse = Panel('EXCHCD', **dates) == 1
-    universe = Panel('SIZE_DECILE', **dates)
-
-    # Compute Book Value
-    pstkrv = Panel('pstkrv')
-    pstkl = Panel('pstkl')
-    pstk = Panel('pstk')
-    seq = Panel('seq')  # total shareholders' equity
-#    preferred_stock = pstkrv\
-#        .apply(replace, pstkl, how='outer', fill_value=0, values=[np.nan, 0])\
-#        .apply(replace, pstk, how='outer', fill_value=0, values=[np.nan, 0])
-    preferred_stock = characteristics_fill(pstkrv, pstkl, pstk, replace=0)
-    txditc = Panel('txditc').filter(end_date='1993-12-31')  # deferred taxes and investment tax credit
-
-    book_value = seq - preferred_stock + txditc  # less preferred stock, add deferred tax before 1993
-
-    age = seq.trend(cumcount)  # at least 2 years of age
-    book_value = book_value.filter(min_value=0, dropna=True, mask=(age >= 2), **dates)
-
-    # Compute Book to Market at December snapshots
-    month = 12  # Decembers
-    book_snapshot = characteristics_snapshots(book_value, month=month)
-    print(f"Snapshot Panel info: {frame_info(book_snapshot.frame)}")
-    company_value = Panel('CAPCO').filter(index=book_snapshot, min_value=1e-6, mask=universe>=0)
-
-    # Lag Book to Market, restrict to universe and form terciles based on NYSE stocks
-    lags = 6
-    book_market = (book_snapshot.filter(index=company_value) / company_value).shift(lags).filter(min_stocks=100)
-
-    # THIS SHOULD BE same as backtesting 
-
-    bm_quantiles = book_market.apply(digitize, reference=nyse, cuts=[0.3, 0.7])
-
-    # Restrict market value to universe, and form size quantiles based on NYSE stocks
-    big_stocks = Panel('SIZE_DECILE', **dates) <= 5   # big <=5, small >5
-
-    # Form intersection
-    market_value = Panel('CAP', **dates)
-#    small = bm_quantiles.filter(mask=(big_stocks == True)).apply(spread_portfolios, market_value)
-#    big = bm_quantiles.filter(mask=(big_stocks == False)).apply(spread_portfolios, market_value)
-#    composite_portfolio = (small + big) / 2  #portfolio_composite([small, big]) / 2
-    BL = market_value.filter(mask=(big_stocks == True) & (bm_quantiles == 1)).apply(portfolio_weights)
-    BH = market_value.filter(mask=(big_stocks == True) & (bm_quantiles == 3)).apply(portfolio_weights)
-    SL = market_value.filter(mask=(big_stocks == False) & (bm_quantiles == 1)).apply(portfolio_weights)
-    SH = market_value.filter(mask=(big_stocks == False) & (bm_quantiles == 3)).apply(portfolio_weights)
-    composite_portfolio = (SH - SL + BH - BL) / 2
-
-    drifted = portfolio_impute(composite_portfolio, drifted=True)
-    turnover = composite_portfolio - drifted
-    print(f"Average Turnover: {turnover.apply(np.abs).apply(np.sum, axis=0).apply(np.mean).frame}")
-
-    composite_returns = portfolio_returns(composite_portfolio)
-    summary = portfolio_evaluation(composite_returns)
-    print(f"Composite Portfolio Summary: {summary}")
-
-    bench = Panel('HML').filter(index=composite_returns) / 100
-    print(portfolio_evaluation(bench))
-    composite_returns.plot(bench, kind='scatter', title='Composite BM vs HML')
-
-    # sort by greatest difference between bench and composite returns
-    diff = (composite_returns - bench).frame.sort_values(by=0, ascending=False)
-    print(diff)
-    toc = time.time()
-    print(f"Total elapsed time: {toc - tic:.2f} seconds")
-    raise Exception
-
-    # Generate Book to Market Factor for all months with 6-month lag
-    window = 11
-    universe = 'ret_exc_lead1m'
-    univ = Panel(universe, **dates)
-    bm = factor_generate(book_market, lags=lags, window=window, univ=univ)
-    print(f"Generated Factor Panel info: {frame_info(bm.frame)}")
-
-    nyse = Panel('crsp_exchcd') == 1
-    size_quantiles = market_value.apply(digitize, reference=nyse, how='left', fill_value=False, cuts=2)
-    bm_quantiles = bm.apply(terciles, reference=nyse, how='left', fill_value=False, cuts=[0.3, 0.7])
-
-    small = bm_quantiles.filter(mask=(size_quantiles == 1)).apply(spread_portfolios, market_value)
-    big = bm_quantiles.filter(mask=(size_quantiles == 2)).apply(spread_portfolios, market_value)
-
-    composite_portfolio = big + small / 2
-    composite_returns = port_returns(composite_portfolio)
-    summary = portfolio_evaluation(composite_returns)
-    print(f"Composite Portfolio Summary: {summary}")
-
-    bench = Panel('HML', **dates) / 100
-    print(portfolio_evaluation(bench))
-    composite_returns.plot(bench, kind='scatter', title='Composite BM vs HML')
-
-
-if False:
-    characteristic = 'book_equity'
-    start_date = '2021-12-01'
-    end_date = '2024-12-31'
-    factor = Panel(characteristic, start_date=start_date, end_date=end_date)
-    print(f"Factor Panel info: {frame_info(factor.frame)}")
-
-    month = 12
-    factor = factor_snapshots(factor, month=month)
-    print(f"Snapshot Panel info: {frame_info(factor.frame)}")
-
-    window = 11
-    lags = 6
-    universe = 'ret_exc_lead1m'
-    univ = Panel(universe, start_date=start_date, end_date=end_date)
-    factor = factor_generate(factor, lags=lags, window=window, univ=univ)
-    print(f"Generated Factor Panel info: {frame_info(factor.frame)}")
 
 if False:
     print(str(datetime.now()))

@@ -27,7 +27,7 @@ from qrafti import Panel, winsorize, panel_or_numeric
 p1 = panel_or_numeric('{panel_id}', **{dates_})
 p2 = panel_or_numeric('{reference_panel_id}', **{dates_})
 p3 = p1.apply(winsorize, None if p2 is None else p2, lower={lower}, upper={upper}).persist()
-print(json.dumps({{'result_panel_id': p3.name}}))
+print(str(p3))
 """
     return _log_and_execute('Panel_winsorize' , code)
 
@@ -54,60 +54,49 @@ from qrafti import Panel, digitize, panel_or_numeric
 p1 = panel_or_numeric('{panel_id}', **{dates_})
 p2 = panel_or_numeric('{reference_panel_id}', **{dates_})
 p3 = p1.apply(digitize, None if p2 is None else p2, cuts={cuts}, ascending={ascending}).persist()
-print(json.dumps({{'result_panel_id': p3.name}}))
+print(str(p3))
 """
     return _log_and_execute('Panel_digitize', code)
 
 @mcp.tool()
-def Panel_characteristics_snapshots(panel_id: str, month: int | list[int] | None = None) -> str:
-    """Create a panel of characteristic snapshots for specific calendar months.
-
-    Args:
-        panel_id (str): Identifier for the source characteristic panel to sample.
-        month (int | list[int] | None, optional): Single month number or list of month numbers (1-12)
-            to capture snapshots for. When ``None`` (default), snapshots are generated for every month.
-
-    Returns:
-        str: JSON string containing the persisted panel identifier and metadata of the snapshot results.
-    """
-
-    # Serialize the month selector so the sandbox can faithfully reconstruct it.
-    #month_payload = json.dumps([] if month is None else month)
-
-    code = f"""
-import json
-from qrafti import Panel, characteristics_snapshots
-characteristics = panel_or_numeric('{panel_id}', **{dates_})
-snapshots = characteristics_snapshots(characteristics, month=month).persist()
-print(json.dumps({{'result_panel_id': snapshots.name, 'metadata': snapshots.info}}))
-"""
-
-    return _log_and_execute('Panel_characteristics_snapshots', code)
-
-
-@mcp.tool()
-def Panel_characteristics_fill(panel_ids: list[str], replace: list | int | float | str | None = None) -> str:
-    """Sequentially fill a base characteristic panel using fallback panels.
+def Panel_characteristics_fill(panel_ids: list[str]) -> str:
+    """If values are not available, then sequentially fill from list of panels in order.
 
     Args:
         panel_ids (list[str]): Ordered identifiers of panels whose values should be combined. The
             first panel serves as the base and later panels provide replacement data.
-        replace (list | int | float | str | None, optional): Values that should be treated as missing in
-            the base panel prior to filling. Scalars are promoted to single-item lists. Defaults to ``None``
-            which results in only NaN replacement.
-
     Returns:
         str: JSON string containing the persisted panel identifier for the filled panel.
     """
     code = f"""
 import json
-from qrafti import Panel, characteristics_fill
-panels = [panel_or_numeric(pid, **{dates_}) for pid in panel_ids]
-filled = characteristics_fill(*panels, replace=replace_values).persist()
-print(json.dumps({{'result_panel_id': filled.name}}))
+from qrafti import Panel, characteristics_fill, panel_or_numeric
+panels = [panel_or_numeric(pid, **{dates_}) for pid in {panel_ids}]
+filled = characteristics_fill(*panels, replace=[0]).persist()
+print(str(filled))
 """
     return _log_and_execute('Panel_characteristics_fill', code)
 
+@mcp.tool()
+def Panel_characteristics_downsample(panel_id: str, month: int | list[int] | None = None) -> str:
+    """Downsample or filters a panel of characteristics by selected months
+
+    Args:
+        panel_id (str): Identifier for the source characteristic panel to sample.
+        month (int | list[int] | None, optional): Single month number or list of month numbers (1-12)
+            to filter or downsamples for. When ``None`` (default), samples are generated for every month.
+
+    Returns:
+        str: JSON string containing the identifier of the persisted panel of downsampled results.
+    """
+    code = f"""
+import json
+from qrafti import Panel, characteristics_downsample, panel_or_numeric
+characteristics = panel_or_numeric('{panel_id}', **{dates_})
+samples = characteristics_downsample(characteristics, month={month}).persist()
+print(str(samples))
+"""
+    return _log_and_execute('Panel_characteristics_downsample', code)
 
 @mcp.tool()
 def Panel_portfolio_turnover(weights_panel_id: str) -> str:
@@ -122,11 +111,13 @@ def Panel_portfolio_turnover(weights_panel_id: str) -> str:
 
     code = f"""
 import json
-from qrafti import Panel, portfolio_impute
-
+import numpy as np
+from qrafti import Panel, portfolio_impute, panel_or_numeric
 weights = panel_or_numeric('{weights_panel_id}', **{dates_})
-turnover = portfolio_impute(weights, drifted=True).persist()
-print(json.dumps({{'result_panel_id': turnover.name}}))
+drifted = portfolio_impute(weights, drifted=True)
+delta = weights - drifted
+turnover = delta.apply(np.abs).apply(np.sum, axis=0).apply(np.mean).persist()
+print(str(turnover))
 """
 
     return _log_and_execute('Panel_portfolio_turnover', code)
@@ -134,21 +125,21 @@ print(json.dumps({{'result_panel_id': turnover.name}}))
 
 @mcp.tool()
 def Panel_sequence(panel_id: str) -> str:
-    """Generate a sequential index for each stock across time using cumulative counts.
+    """Compute the cumulative number of available data points for each stock observation.
 
     Args:
         panel_id (str): Identifier for the panel whose chronological sequence per stock is desired.
 
     Returns:
-        str: JSON string containing the persisted panel identifier and metadata with sequence numbers.
+        str: JSON string containing the identifier of the persisted panel identifier with cumulative counts.
     """
     code = f"""
 import json
-from qrafti import Panel, cumcount
+from qrafti import Panel, cumcount, panel_or_numeric
 
 panel = Panel('{panel_id}', **{dates_})
 sequence = panel.trend(cumcount).persist()
-print(json.dumps({{'result_panel_id': sequence.name, 'metadata': sequence.info}}))
+print(str(sequence))
 """
     return _log_and_execute('Panel_sequence', code)
 
@@ -171,24 +162,24 @@ import json
 from qrafti import Panel, portfolio_weights, panel_or_numeric
 p1 = panel_or_numeric('{panel_id}', **{dates_})
 p2 = p1.apply(portfolio_weights, net={net}, leverage={leverage}).persist()
-print(json.dumps({{'result_panel_id': p2.name}}))
+print(str(p2))
 """
     return _log_and_execute('Panel_portfolio_weights', code)
 
 @mcp.tool()
 def Panel_portfolio_returns(port_weights_panel_id: str) -> str:
-    """Compute the portfolio or factor returns given portfolio weights.
+    """Compute the portfolio or factor returns given factor portfolio weights.
     Args:
         port_weights_panel_id (str): The id of the panel data set for portfolio weights.
     Returns:
-        str: the id of the created Panel of returns of the factor or portfolio in the cache in JSON format
+        str: JSON format of the id of the created Panel of returns of the factor or portfolio 
     """
     code = f"""
 import json
 from qrafti import Panel, portfolio_returns, panel_or_numeric
 p_weights = panel_or_numeric('{port_weights_panel_id}', **{dates_})
 p_returns = portfolio_returns(p_weights).persist()
-print(json.dumps({{'result_panel_id': p_returns.name}}))
+print(str(p_returns))
 """
     return _log_and_execute('Panel_portfolio_returns', code)
 

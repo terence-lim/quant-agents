@@ -1,3 +1,4 @@
+# signals.py (Terence Lim, 2025)
 import pandas as pd
 import numpy as np
 from pandas.api.types import is_list_like, is_integer_dtype
@@ -15,7 +16,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import warnings
 
-from qrafti import STOCK_NAME, DATE_NAME, Panel, DATA_LAKE, Calendar
+from qrafti import STOCK_NAME, DATE_NAME, Panel, DATA_LAKE, Calendar, cumcount
 
 PSTAT_DATA = Path('/home/terence/Downloads/scratch/2024/PSTAT')
 CRSP_DATA = Path('/home/terence/Downloads/scratch/2024/CRSP')
@@ -70,6 +71,12 @@ class Lookup:
             return 0
 
 
+###########################
+#
+# load_pivot: for JKP benchmarks
+#
+###########################
+
 def load_pivot_csv(values: str, 
                    index: str, 
                    columns: str,
@@ -85,7 +92,7 @@ def load_pivot_csv(values: str,
     df.index.name = DATE_NAME
     return df
 
-### Load benchmarks
+### To Load benchmarks
 ret_type = 'ret_vw_cap'
 # benchmarks_df = load_pivot_csv(values=ret_type, index='eom', columns='characteristic', sep=',',
 #                                filename=BENCH_DATA / 'USA.csv')
@@ -95,12 +102,22 @@ ret_type = 'ret_vw_cap'
 #      df.columns = [col]
 #      Panel(col).set_frame(df).persist(col)
 
+# TO DO:
+# 1. names of JKP benchmark returns for "benchmarks.txt" -- then into load_variables ?
+# 2. only keep those columns from load_pivot for "variables.txt"
+
+###########################
+#
+# load_panel_csv: for PSTAT and JKP characteristics
+#
+###########################
 
 def load_panel_csv(filename: str | Path, 
                    stock_name: str,
                    date_name: str,
                    sep: str,
                    append: bool,
+                   aged: int,
                    filter: Dict ={},
                    keep: List[str] = []) -> None:
     """Load each column of CSV file to its own Panel."""
@@ -139,14 +156,25 @@ def load_panel_csv(filename: str | Path,
         df = df_data[[col]].dropna().convert_dtypes()
         panel = Panel(col)
         print(panel.name, len(panel), panel.nlevels)
-        panel = panel.set_frame(df, append=append).persist(col)
-        print(panel.name, len(panel), panel.nlevels)
+        panel = panel.set_frame(df, append=append)
+        print('  - append:', panel.name, len(panel), panel.nlevels)
+        if aged:
+            age = panel.trend(cumcount)  # observation age
+            panel = panel.filter(mask=(age >= aged)).persist(col)
+            print(f'  - aged{aged}:', panel.name, len(panel), panel.nlevels)
         pprint(panel.info)
         #print(df.head())
 
+#################
+#
+# load_csv - FF factor returns
+#
+#################
 def load_csv(filename: str | Path, 
              date_name: str,
              sep: str,
+             append: bool,
+             mul: float = 1.0,
              keep: List[str] = []) -> None:
     """Load each column of CSV file to its own Panel."""
 # if True:
@@ -172,28 +200,23 @@ def load_csv(filename: str | Path,
         df.index.name = DATE_NAME
         panel = Panel(col)
         print(panel.name, len(panel), panel.nlevels)
-        panel = panel.set_frame(df, append=True).persist(col)
+        panel = panel.set_frame(df * mul, append=append).persist(col)
         print(panel.name, len(panel), panel.nlevels)
         pprint(panel.info)
         #print(df.head())
 
+# To load Fama-French factors
+# load_csv(DATA_LAKE / 'FF.csv', mul=0.01, date_name='Date', sep='\t', keep=['Mkt-RF', 'HML'])
+
+######################
 #
-# TO DO:
-# 1. load_csv and load_pivot should shift dates by -1 to align with rebalance dates 
-# 2. names of benchmark returns for "benchmarks.txt"
-# 3. only keep those columns from load_pivot for "variables.txt"
-
-#load_csv(DATA_LAKE / 'FF.csv', date_name='Date', sep='\t', keep=['Mkt-RF', 'HML'])
-
-# if True:
-#     filename = DATA_LAKE / 'FF.csv'
-#     date_name = 'Date'
-#     sep = '\t'
-#     keep=['Mkt-RF', 'HML']
-
+# load_crsp - for CRSP Monthly
+#
+######################
 def load_crsp(filename: str | Path, 
               date: str,
               sep: str,
+              restrict_universe=False,
               keep: List[str] = []) -> None:
     """Load each column of CSV file to its own Panel."""
 
@@ -228,11 +251,23 @@ def load_crsp(filename: str | Path,
     replace_ = (df_data['DLRET'].isna() & df_data['DLSTCD'].isin(dlstcodes_))
     df_data.loc[replace_, 'DLRET'] = -0.3
 
+    # restrict to domestic common stocks only
+    universe_ = (df_data['SHRCD'].isin([10,11]) & 
+                 df_data['EXCHCD'].isin([1,2,3]) &
+                 (df_data['CAPCO'] > 1e-8) &
+                 (df_data['CAP'] > 1e-8) &
+                 (df_data['PRC'].abs() > 1e-8))
+    if restrict_universe:
+        length = len(df_data)
+        df_data = df_data.loc[universe_, :]
+        print('Restricted Universe:', length, len(df_data))
+
+    # adjust RET and RETX for delisting returns
     replace_ = df_data['DLRET'].notna()
     df_data.loc[replace_, 'RETX'] =  (1+df_data['RETX'].fillna(0)) * (1+df_data['DLRET']) - 1
     df_data.loc[replace_, 'RET'] =  (1+df_data['RET'].fillna(0)) * (1+df_data['DLRET']) - 1
 
-    for col in ['CAPCO', 'CAP', 'PRC', 'RET', 'RETX', 'VOL', 'SHRCD', 'EXCHCD', 'SICCD']:
+    for col in tqdm(['CAPCO', 'CAP', 'PRC', 'RET', 'RETX', 'VOL', 'SHRCD', 'EXCHCD', 'SICCD']):
         df = df_data[[date, 'PERMNO', col]]
         if col in ['CAPCO', 'CAP']:  # greater than 0, notna
             df = df[df[col] > 1e-4].dropna()
@@ -259,11 +294,6 @@ def load_crsp(filename: str | Path,
         ranks = pd.cut(x['CAPCO'], bins=breakpoints, labels=range(10,0,-1), include_lowest=True)
         return ranks.astype(int)   # decile ranks from 1 (largest) to 10 (smallest)
 
-    universe_ = (df_data['SHRCD'].isin([10,11]) & 
-                 df_data['EXCHCD'].isin([1,2,3]) &
-                 (df_data['CAPCO'] > 1e-8) &
-                 (df_data['CAP'] > 1e-8) &
-                 (df_data['PRC'].abs() > 1e-8))
     df = df_data.loc[universe_, [date, 'PERMNO', 'CAPCO', 'EXCHCD']].set_index([date, 'PERMNO']).sort_index()
     df = df.groupby(level=0).apply(deciles).rename('SIZE_DECILE')
     while df.index.nlevels > 2:
@@ -272,32 +302,33 @@ def load_crsp(filename: str | Path,
     print(panel.name, len(panel), panel.nlevels)
     
 
-# if True:
-#     filename = DATA_LAKE / 'FF.csv'
-#     date_name = 'Date'
-#     sep = '\t'
-#     keep=['Mkt-RF', 'HML']
-
 if __name__ == '__main__':
 
-    stock_name = 'gvkey'
-#    stock_name = 'LPERMNO'
+    # Load Fama-French factors
+    #load_csv(DATA_LAKE / 'FF.csv', date_name='Date', sep='\t', 
+    #         mul=0.01, append=False, keep=['Mkt-RF', 'HML'])
+
+    # Load CRSP monthly data
+    restrict_universe = True
+    load_crsp(DATA_LAKE / 'crsp.txt.gz', date='date', sep='\t', restrict_universe=restrict_universe)
+
+    # Load PSTAT annual data
+    stock_name = 'gvkey'   # 'LPERMNO'
     date_name = 'datadate'
     sep = '\t'
-    keep = ['txditc'] #'seq', 'pstk', 'pstkrv', 'pstkl']
-    filter = dict(indfmt = 'INDL',
-                  datafmt = 'STD',
-                  curcd = 'USD',
-                  popsrc = 'D',
-                  consol = 'C')
-    append = False
+    keep = ['txditc', 'seq', 'pstk', 'pstkrv', 'pstkl']
+    filter = dict(indfmt = 'INDL', datafmt = 'STD', curcd = 'USD', popsrc = 'D', consol = 'C')
+    aged = 2
+
+    append = False  # to start loop over input files
     for subname in ['']:  #['2020', '2010']:
         filename = PSTAT_DATA / f"annual{subname}.txt.gz"
 #        filename = DATA_LAKE / f"annual{subname}.txt.gz"
         load_panel_csv(filename, stock_name=stock_name, date_name=date_name, 
-                       append=append, sep=sep, keep=keep, filter=filter)
+                       append=append, sep=sep, keep=keep, aged=aged, filter=filter)
         append = True
 
+# For 
 #for filename in tqdm(sorted((DATA_LAKE / 'USA').glob('19[8765432]*.txt.gz'), reverse=True)):
 #    print(f"Loading {filename}")
-#    load_panel_csv(filename, stock_name=STOCK_NAME, date_name=DATE_NAME, sep='\t')
+#    load_panel_csv(filename, stock_name=STOCK_NAME, date_name=DATE_NAME, age=False, sep='\t')

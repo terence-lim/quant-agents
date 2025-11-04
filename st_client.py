@@ -17,6 +17,8 @@ load_dotenv()
 # Configure logging
 #logfire.configure()
 #logfire.instrument_pydantic_ai()
+import logging
+logging.basicConfig(level=logging.DEBUG)
 
 # Settings
 always_show_manager = False
@@ -66,7 +68,7 @@ If a specialized agent tool could not complete a step because it was assigned to
 then you should delegate the step to to the specialized agent it was assigned to.
 You may use the get_variables_descriptions tool to look for Panel ids of stocks data.
 Do not use or assume any data, characteristics or definitions that you were not given or you did not generate from a specialized agent.
-Explain to the user the steps you took, the planner output you received and the agent tools you used for each step;
+You must explain the steps you took, the planner output you received and the agent tools you used for each step;
 do not output in JSON format or python code, but you should use bulleted points or narrative format for clarity.
 """.strip(),
     model_settings={'temperature': 0.0},
@@ -121,7 +123,7 @@ Do not perform any steps that were assigned to other agent tools.
 If a tool call returned an unexpected error, try calling once more with the same parameters.
 Do not use or assume any data, characteristics or definitions that you were not given or you did not generate with a tool
 You may use the get_variables_descriptions tool to look for Panel ids of stocks data.
-Explain in detail every step you took and all the tools you used.
+You must explain in detail every step you took and all the tools you used.
 """.strip(),
     toolsets=[factor_server, metadata_server],
     model_settings={'temperature': 0.0}  # 0.1
@@ -139,7 +141,7 @@ Do not perform any steps that were assigned to other agent tools.
 If a tool call returned an unexpected error, try calling once more with the same parameters.
 Do not use or assume use any data, characteristics or definitions that you were not given or you did not generate with a tool.
 You may use the get_variables_descriptions tool to look for Panel ids of stocks data.
-Explain in detail every step you took and all the tools you used.
+You must explain in detail every step you took and all the tools you used.
 """.strip(),
     toolsets=[performance_server, metadata_server],
     model_settings={'temperature': 0.0}  # 0.1
@@ -315,3 +317,4 @@ if prompt := st.chat_input("Type your message..."):
         debug_text = build_conversation_context()
         with (open("debug_query.txt", "w") as f):
             f.write(debug_text.replace("\nUser:", f"\n\n{'-' * 40}\nUser:"))
+            f.flush()

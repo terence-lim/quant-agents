@@ -10,6 +10,7 @@ def log_message(payload: str, tool_name: str, code: str, mode: str = "a"):
     message = f"Output: {payload}\nTool: {tool_name}{' '*10}Date: {str(datetime.now())[:19]}\n{code}\n\n{'-'*60}\n\n"
     with open("mcp_server.log", "a") as f:
         f.write(message)
+        f.flush()
     print(message)
 
 # log_message(f"MCP server started on {str(datetime.now())}", mode="w")

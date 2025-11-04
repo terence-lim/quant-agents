@@ -16,7 +16,7 @@ from qrafti import Panel, panel_or_numeric
 p1 = panel_or_numeric('{panel_id}', **{dates_})
 p2 = panel_or_numeric('{other_panel_id}', **{dates_})
 p3 = ({op}).persist()
-print(json.dumps({{'result_panel_id': p3.name}}))
+print(str(p3))
 """
 
 
@@ -27,54 +27,54 @@ import json
 from qrafti import Panel, panel_or_numeric
 p1 = panel_or_numeric('{panel_id}', **{dates_})
 p2 = ({op}).persist()
-print(json.dumps({{'result_panel_id': p2.name}}))
+print(str(p2))
 """
 
 
-@mcp.tool()
-def Panel_matmul(panel_id: str | int | float, other_panel_id: str | int | float) -> str:
-   """Compute the dot product (matrix multiplication) between two Panels.
-   Args:
-       panel_id (str): The id of the first panel data set.
-       other_panel_id (str): The id of the second panel data set.
-   Returns:
-       str: the id of the created Panel in the cache in JSON format
-   """
-   code = _binary_panel_operation_code("p1 @ p2", panel_id, other_panel_id)
-   return _log_and_execute("Panel_matmul", code)
+# @mcp.tool()
+# def Panel_matmul(panel_id: str | int | float, other_panel_id: str | int | float) -> str:
+#    """Compute the dot product (matrix multiplication) between two Panels.
+#    Args:
+#        panel_id (str): The id of the first panel data set.
+#        other_panel_id (str): The id of the second panel data set.
+#    Returns:
+#        str: the id of the created Panel in the cache in JSON format
+#    """
+#    code = _binary_panel_operation_code("p1 @ p2", panel_id, other_panel_id)
+#    return _log_and_execute("Panel_matmul", code)
 
 
 @mcp.tool()
 def Panel_add(panel_id: str | int | float, other_panel_id: str | int | float) -> str:
-    """Add two Panels element-wise."""
+    """Add two Panels element-wise, or adds first portfolio's weights or returns to the second portfolio"""
     code = _binary_panel_operation_code("p1 + p2", panel_id, other_panel_id)
     return _log_and_execute("Panel_add", code)
 
 
 @mcp.tool()
 def Panel_radd(panel_id: str | int | float, other_panel_id: str | int | float) -> str:
-    """Add two Panels element-wise (reverse order)."""
+    """Add two Panels element-wise (reverse order), or adds second portfolio's weights or returns to the first"""
     code = _binary_panel_operation_code("p1.__radd__(p2)", panel_id, other_panel_id)
     return _log_and_execute("Panel_radd", code)
 
 
 @mcp.tool()
 def Panel_sub(panel_id: str | int | float, other_panel_id: str | int | float) -> str:
-    """Subtract the second Panel from the first Panel."""
+    """Subtract the second Panel from the first Panel, or combines first portfolio's weights or returns to the negative of the second"""
     code = _binary_panel_operation_code("p1 - p2", panel_id, other_panel_id)
     return _log_and_execute("Panel_sub", code)
 
 
 @mcp.tool()
 def Panel_rsub(panel_id: str | int | float, other_panel_id: str | int | float) -> str:
-    """Subtract the first Panel from the second Panel."""
+    """Subtract the first Panel from the second Panel, or combines second portfolio's weights or returns to the negative of the first"""
     code = _binary_panel_operation_code("p1.__rsub__(p2)", panel_id, other_panel_id)
     return _log_and_execute("Panel_rsub", code)
 
 
 @mcp.tool()
 def Panel_mul(panel_id: str | int | float, other_panel_id: str | int | float) -> str:
-    """Multiply two Panels element-wise."""
+    """Multiply two Panels element-wise, or multiples first portfolio's weights or returns by the other int or float value"""
     code = _binary_panel_operation_code("p1 * p2", panel_id, other_panel_id)
     return _log_and_execute("Panel_mul", code)
 
@@ -88,7 +88,7 @@ def Panel_rmul(panel_id: str | int | float, other_panel_id: str | int | float) -
 
 @mcp.tool()
 def Panel_truediv(panel_id: str | int | float, other_panel_id: str | int | float) -> str:
-    """Divide the first Panel by the second Panel."""
+    """Divide the first Panel by the second Panel, or divides first portfolio's weights or returns by the other int or float value"""
     code = _binary_panel_operation_code("p1 / p2", panel_id, other_panel_id)
     return _log_and_execute("Panel_truediv", code)
 
@@ -189,7 +189,6 @@ def Panel_filter(
     panel_id: str,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
-    dates: Optional[List[str]] = None,
     stocks: Optional[List[str]] = None,
     min_stocks: Optional[int] = None,
     min_value: Optional[float] = None,
@@ -199,13 +198,12 @@ def Panel_filter(
     index_panel_id: Optional[str] = None,
     dropna: bool = False,
 ) -> str:
-    """Filter a Panel by invoking ``Panel.fill`` (or ``Panel.filter`` when unavailable).
+    """Filter a Panel by keeping only rows that satisfy the specify the optional criteria.
 
     Args:
         panel_id: Identifier of the Panel to filter.
-        start_date: Keep rows with dates on or after this value.
-        end_date: Keep rows with dates on or before this value.
-        dates: Explicit list of dates to retain.
+        start_date: Keep rows with dates on or after this value, in the form 'YYYY-MM-DD'
+        end_date: Keep rows with dates on or before this value, in the form 'YYYY-MM-DD'
         stocks: Explicit list of stocks to retain.
         min_stocks: Minimum number of stocks per date required to keep that date.
         min_value: Minimum data value to retain.
@@ -226,9 +224,8 @@ p1 = panel_or_numeric('{panel_id}', **{dates_})
 mask_panel = panel_or_numeric('{mask_panel_id}', **{dates_})
 index_panel = panel_or_numeric('{index_panel_id}', **{dates_})
 
-p2 = p1.filter(start_date={start_date},
-    end_date={end_date},
-    dates={dates},
+p2 = p1.filter(start_date='{start_date}',
+    end_date='{end_date}',
     stocks={stocks},
     min_stocks={min_stocks},
     min_value={min_value},
@@ -237,39 +234,34 @@ p2 = p1.filter(start_date={start_date},
     dropna=True if {dropna} else False,
     mask=mask_panel,
     index=index_panel).persist()
-print(json.dumps({{'result_panel_id': p2.name}}))
+print(str(p2))
 """
     return _log_and_execute("Panel_filter", code)
 
 @mcp.tool()
 def Panel_shift(panel_id: str, shift: int = 1) -> str:
     """
-    Create a new Panel with its date index shifted forward, by one date by default.
-
-    This function moves all data forward in time along the date index.
-    The dates with no values to shift from in the dataset are dropped.
-
-    Common use cases include aligning lagged or forward-looking features in 
-    time-series and panel data analysis.
+    Create a new Panel with its date index shifted forward by a specified number of steps,
+    effectively adding lags to the data.
 
     Args:
         panel_id (str): 
             The ID of the existing Panel to shift. This should correspond to 
             a Panel object stored in the cache.
-        shift (int, optional): 
+        shift (int, optional):
             The number of date steps to shift forward. Default is 1.
 
     Returns:
         str: 
             The ID of the newly created Panel (stored in the cache) whose dates 
-            have been shifted forward by one step.
+            have been shifted forward.
     """
     code = f"""
 import json
 from qrafti import Panel, panel_or_numeric
 p1 = panel_or_numeric('{panel_id}', **{dates_})
 p2 = p1.shift(shift={shift}).persist()
-print(json.dumps({{'result_panel_id': p2.name}}))
+print(str(p2))
 """
     return _log_and_execute("Panel_shift", code)
 
@@ -277,12 +269,12 @@ print(json.dumps({{'result_panel_id': p2.name}}))
 SPECIALIZED_AGENT_TOOLS: Dict[str, List[Dict[str, str]]] = {
     "factor_agent_tool": [
         {
-            "name": "Panel_characteristics_snapshots",
-            "description": "Capture forward-filled characteristic snapshots for selected calendar months.",
+            "name": "Panel_characteristics_downsample",
+            "description": "Down-samples or filters characteristic by selected calendar months.",
         },
         {
             "name": "Panel_characteristics_fill",
-            "description": "Fill characteristic panels sequentially using fallback sources and optional value replacements.",
+            "description": "If values are not available, then sequentially fill from list of panels in order.",
         },
         {
             "name": "Panel_portfolio_turnover",
@@ -290,7 +282,7 @@ SPECIALIZED_AGENT_TOOLS: Dict[str, List[Dict[str, str]]] = {
         },
         {
             "name": "Panel_sequence",
-            "description": "Compute per-stock observation sequence numbers via cumulative counts.",
+            "description": "Compute the cumulative number of available data points for each stock observation",
         },
         {
             "name": "Panel_winsorize",
@@ -336,7 +328,7 @@ def _server_tool_metadata() -> List[Dict[str, str]]:
     """Collect metadata for MCP tools defined in this server module."""
 
     tool_functions: List[Callable[..., str]] = [
-        Panel_matmul,
+        # Panel_matmul,
         Panel_add,
         Panel_radd,
         Panel_sub,

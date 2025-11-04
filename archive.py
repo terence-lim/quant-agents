@@ -156,7 +156,7 @@ def weighted_average(x):
 #     "description": "Construct long-short spread portfolio weights between highest and lowest quantiles, using optional weights.",
 # },
 
-"""
+
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -256,6 +256,25 @@ def pie_chart(data, labels, title: str, ncol=3):
     )
 
 if __name__ == "__main__":
+    import re
+    from pathlib import Path
+    filename = Path('/home/terence/Downloads/scratch/2024/JKP/variables.txt.orig')
+    names, types, descriptions = [], [], []
+    with open(filename, 'r', encoding='utf-8') as f:
+        for line in f:
+            if line.strip().lower().startswith('name '):
+                continue  # skip header
+            # Use regex to extract: name type length description
+            match = re.match(r'^(\S+)\s+(\S+)\s+\S+\s+(.*)', line.strip())
+            if match:
+                name, typ, desc = match.group(1), match.group(2), match.group(3)
+                names.append(name)
+                types.append(typ)
+                descriptions.append(desc)
+    df = pd.DataFrame({'Type': types, 'Description': descriptions}, index=names)
+    df.index.name = 'Name'
+
+if False:
     data = {"GPT family":58, "Claude":13, "LLaMA":11, "Gemini": 11, "other":7}
     pie_chart(data.values(), data.keys(), title="Models Employed (%)")
     plt.tight_layout()
