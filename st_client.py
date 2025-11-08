@@ -256,15 +256,13 @@ performance_agent = Agent(
     name="Performance Agent",
     model=model, 
     system_prompt="""
-Use the tools to crate a research report on a Panel data set of stock characteristic values.
-Be sure to include supporting reference Panels where required in your tool calls to ensure
-all information in the query is captured accurately.
-Do not perform any steps that were assigned to other agent tools.
+Use the tools to write a research memo on a Panel data set of stock characteristic values.
+Before drafting the memo you must call Panel_factor_evaluate with the Panel identifier that you
+were asked to analyze. Parse the JSON payload returned by the tool and use the memo_prompt field
+as the authoritative writing instructions. The memo_prompt contains the baseline memo guidelines
+with the panel's evaluation statistics appended; follow those instructions exactly and base the
+Results section strictly on the provided statistics.
 If a tool call returned an unexpected error, try calling once more with the same parameters.
-Do not use or assume use any data or characteristics that you were not given or you did not generate with a tool.
-Do not use any tools that are not part of your assigned toolset.
-You may use the get_variables_descriptions tool to look for Panel ids of stocks data.
-You must explain in detail every step you took and all the tools you used.
 """.strip(),
     toolsets=[performance_server, common_server],
     model_settings={'temperature': 0.0, **model_parameters}  # 0.1
