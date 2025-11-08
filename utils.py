@@ -13,7 +13,7 @@ def log_message(output: str = '', tool: str = '', code: str = '', mode: str = "a
     message = "\n".join(message) + f"\nDate: {str(datetime.now())[:19]}\n" 
     with open("mcp_server.log", mode) as f:
         f.write(message)
-    f.flush()
+        f.flush()
     print(message)
 
 # log_message(f"MCP server started on {str(datetime.now())}", mode="w")

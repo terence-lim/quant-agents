@@ -169,10 +169,13 @@ def load_variables(filenames = ['PSTAT.csv', 'JKP.csv'],
 #
 import subprocess, sys, os#
 def run_code_in_subprocess(code_str):
+    with open('/home/terence/Dropbox/github/thesis/quant-agents/tmp.log', 'w') as f:
+        f.write(f"RUN CODE IN SUBPROCESS: {code_str}\n")
+        f.flush()
+        
     env = os.environ.copy()
     # prepend your project root to PYTHONPATH
     env["PYTHONPATH"] = "/home/terence/Dropbox/github/thesis/quant-agents:" + env.get("PYTHONPATH", "")
-
     proc = subprocess.run(
         [sys.executable, "-c", code_str],
         capture_output=True,
@@ -182,6 +185,21 @@ def run_code_in_subprocess(code_str):
     print(f"Subprocess exited with code {proc.returncode}")
     return proc.stdout, proc.stderr, proc.returncode    
 
+test_str = """
+panel_id = 'me' 
+from qrafti import Panel
+import pandas as pd
+p1 = Panel(f'{panel_id}') 
+p2 = Panel('crsp_exchcd').apply(pd.DataFrame.isin, values=[1, '1'])
+def winsorize(x, lower=0.0, upper=1.0) -> pd.Series: 
+   lower, upper = x.loc[x.iloc[:,-1].astype(bool), x.columns[0]].quantile([lower, upper]).values 
+   return x.iloc[:, 0].clip(lower=lower, upper=upper)
+
+p3 = p1.apply(winsorize, 1 if p2 is None else p2, lower=0, upper=0.8, fill_value=True).persist()
+print(str(p3))  # returns saved name of the panel as JSON string
+"""
+#from qrafti import run_code_in_subprocess
+#stdout, stderr, exit_code = run_code_in_subprocess(test_str)
 
 ###########################
 #
@@ -1225,9 +1243,6 @@ def markdown_to_pdf(markdown_text: str, stylesheets: List[str] = ['style.css'],
     return dict(output_file=output_file)
 
 if __name__ == "__main__":
-    print(load_variables())
-    raise Exception
-
     def show(x):
         if isinstance(x, int):
             x = Panel(f'_{x}')
@@ -1250,12 +1265,13 @@ if __name__ == "__main__":
     tic = time.time()
     print(str(datetime.now()))
 
-    dates = DATES
     dates = dict(start_date='1975-01-01', end_date='2024-12-31')
     dates = dict(start_date='2020-01-01', end_date='2024-12-31')
+    dates = DATES
+    print(json.dumps(dates, indent=4))
 
-
-
+    print(load_variables())
+#    raise Exception
 
 #    act = Panel('act', **dates)
 #    ebitda = Panel('ebitda', **dates)
@@ -1269,7 +1285,7 @@ if __name__ == "__main__":
 
     dates = dict(start_date='1970-01-01', end_date='2024-12-31') #'2020-01-01'
     dates = dict(start_date='2020-01-01', end_date='2024-12-31') #
-    _dates = {}   # require all dates in case of aging
+    # _dates = {}   # require all dates in case of aging -- not necc any more after pre-processing
     _dates = dates
 
     # Compute Book Value

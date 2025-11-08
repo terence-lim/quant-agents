@@ -49,9 +49,8 @@ In your writing, please:
 * Make clear distinctions between correlation and causation.
 * Avoid speculation beyond the data.
 
-Output in markdown format with sections: Introduction, Hypothesis Development, Results, Contribution.
-
-Base the results section strictly on the following data, matching its terminology and precision:
+Output in markdown format with 5 sections: Introduction, Hypothesis Development, Results, Contribution, Statistical Tables. The statistical tables section reproduces the statistical tables data provided below.
+Base the results section strictly on the following statistical tables data, matching its terminology and precision:
 """
 
 

@@ -28,6 +28,7 @@ def execute_python(code_str: str) -> str:
     """
     log_message(tool='execute_python', code=code_str)
     stdout, stderr, exit_code = run_code_in_subprocess(code_str)
+    log_message(f"{stdout=}, {stderr=}, {exit_code=}", tool='execute_python')
     # print('Exit code:', exit_code)
     # print(stderr)
     if exit_code:
