@@ -1,0 +1,106 @@
+/* Basic document setup */
+body {
+  font-family: "Helvetica", "Arial", sans-serif;
+  font-size: 10pt;       /* overall text size */
+  line-height: 1.3;
+  color: #000;
+  margin: 1cm;
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600;
+  margin-top: 0.8em;
+  margin-bottom: 0.4em;
+}
+
+/* Paragraphs */
+p {
+  margin: 0.4em 0;
+}
+
+/* LIST STYLING */
+
+/* General list settings */
+ul, ol {
+  margin-top: 0.4em;
+  margin-bottom: 0.6em;
+  padding-left: 1.2em;         /* control indent */
+  line-height: 1.4;
+}
+
+/* Unordered list bullets */
+ul {
+  list-style-type: disc;        /* standard round bullet */
+}
+
+/* Ordered list numbering */
+ol {
+  list-style-type: decimal;     /* 1., 2., 3. */
+}
+
+/* Nested lists */
+ul ul, ol ul, ul ol, ol ol {
+  margin-top: 0.2em;
+  margin-bottom: 0.2em;
+  padding-left: 1.4em;
+  font-size: 10pt;
+}
+
+/* List item spacing */
+li {
+  margin-bottom: 0.25em;
+}
+
+/* Improve readability inside PDFs */
+li p {
+  margin: 0.1em 0;
+}
+
+/* Optional — align bullets vertically with multi-line text */
+li::marker {
+  font-size: 0.9em;
+  color: #444;
+}
+
+
+/* Tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 8pt;        /* slightly smaller than body text */
+  margin-top: 0.8em;
+  margin-bottom: 1em;
+}
+
+/* Table headers */
+th {
+  background-color: #f0f0f0;
+  text-align: left;
+  font-weight: bold;
+  border: 1px solid #999;
+  padding: 4px 8px;
+}
+
+/* Table cells */
+td {
+  border: 1px solid #999;
+  padding: 4px 8px;
+}
+
+/* Alternate row shading for readability */
+tr:nth-child(even) {
+  background-color: #fafafa;
+}
+
+/* Code blocks (optional) */
+code, pre {
+  font-family: "Courier New", monospace;
+  font-size: 8pt;
+}
+
+/* Page break handling for long tables */
+table, tr, td, th {
+  page-break-inside: avoid;
+}
+

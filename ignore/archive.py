@@ -25,6 +25,211 @@
 # Describe the computation field with enough detail for the executing agent to know which tool call and
 # parameters are needed.
 
+# {panel_id=}, {start_date=}, {end_date=}, {min_stocks=}, {min_value=}, {max_value=}, {dropna=}, 
+#        start_date: Keep rows with dates on or after this value, in the form 'YYYY-MM-DD'
+#        end_date: Keep rows with dates on or before this value, in the form 'YYYY-MM-DD'
+#        min_stocks: Minimum number of stocks per date required to keep that date.
+#        min_value: Minimum data value to retain.
+#        max_value: Maximum data value to retain.
+#        isin: Explicit list of acceptable data values.
+#        dropna: If True, drop rows whose values are NaN before persisting.
+
+# python performance_server.py
+from mcp.server.fastmcp import FastMCP
+from utils import _log_and_execute, dates_, log_message
+from pydantic_ai import Agent   # use Agent within a tool call
+from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.providers.openai import OpenAIProvider
+import json
+import asyncio
+import logging
+from pydantic_ai.exceptions import UnexpectedModelBehavior
+    
+from dotenv import load_dotenv
+load_dotenv()
+
+# Create an MCP server
+
+port = 8001
+mcp = FastMCP("performance-server", host="0.0.0.0", port=port)
+
+#model = "gemini-2.5-flash"
+#model = OpenAIChatModel(model_name="gpt-4.1-mini")
+#server_agent = Agent(model=model,
+#                     system_prompt='You are a helpful assistant specialized in quantitative finance and portfolio performance evaluation.')
+
+async def run_agent_with_timeout(agent, prompt: str, timeout_s: int = 120) -> str:
+    """
+    Run the pydantic-ai agent with a timeout + resilient error handling.
+    Distinguish between client cancellations and model glitches.
+    """
+    try:
+        # Give OpenAI enough time; keep this larger than your MCP tool timeout.
+        res = await asyncio.wait_for(agent.run(prompt=prompt), timeout=timeout_s)
+        return res.output if hasattr(res, "output") else str(res)
+
+    except asyncio.CancelledError:
+        # The MCP client or framework cancelled the tool call (rerun/timeout/disconnect).
+        logging.warning("Agent run was cancelled by the caller (tool timeout/rerun/disconnect).")
+        # Re-raise if you want the tool to hard-cancel, OR return a friendly string:
+        return "Request was cancelled by the caller (timeout or rerun). Please try again."
+
+    except UnexpectedModelBehavior as e:
+        # Gemini/OpenAI occasionally return empty payloads; surface a readable message.
+        logging.warning("Model returned unexpected payload: %s", e)
+        return ("Agent could not complete the step because the model returned an empty payload. "
+                "Please try again or switch models.")
+
+    except Exception as e:
+        logging.exception("Agent run failed:")
+        return f"Agent error: {e}"
+
+
+@mcp.tool(timeout=180)
+async def Panel_factor_evaluate(factor_panel_id: str, description: str = '') -> str:
+    """Provides a prompt with instructions and context to generate a research report 
+    for evaluating a Panel of factor characteristic values for predicting stock returns.
+
+    Args:
+        factor_panel_id (str): The id of the panel data set for factor characteristic values.
+        description (str): A full description and definition of the factor.
+    Returns:
+        str: A prompt containing instructions and context for generating a research report evaluating the factor.
+    """
+    # TO DO: 
+    # (1) save factor_evaluation to a temp folder 
+    # (2) return path as json 
+    # (3) include prompt to save report after generation
+    description = description.replace('"', "'")  # sanitize quotes
+    code = f"""
+import json
+from qrafti import Panel, factor_evaluate, MEDIA, research_prompt
+panel = Panel('{factor_panel_id}', **{dates_})
+evaluate_str = factor_evaluate(panel)
+#subfolder = 'folder_0'
+#output_folder = MEDIA / subfolder
+#output_folder.mkdir(parents=True, exist_ok=True)
+#with open(output_folder / 'research_memo.md', 'w') as f:
+#    f.write(evaluate_str)
+#prompt_string = "{description}" + "\\n---------\\n" + research_prompt + "\\n\\n" + evaluate_str
+#print(json.dumps(dict(prompt_string=prompt_string, output_folder=subfolder)))
+print(evaluate_str)
+"""
+    # payload = _log_and_execute('Panel_factor_evaluate', code)
+    # if 'prompt_string' in payload:
+    #     result = json.loads(payload)
+    #     prompt_string = result['prompt_string']
+    #     log_message('Server Calling Agent With Prompt', 'Panel_factor_evaluate', prompt_string)
+    #     #response = await run_agent_with_timeout(server_agent, prompt_string, timeout_s=180)
+    #     #response = await server_agent.run(prompt=prompt_string)
+    #     response = await asyncio.wait_for(server_agent.run(prompt=prompt), timeout=timeout_s)
+    #     response = response.output if hasattr(response, "output") else str(response)
+    #     log_message('Server Agent Returned Payload', 'Panel_factor_evaluate', response)
+    #     return f"Research Memo:\n\n{response}"
+    # else:
+    #     return payload        
+
+SPECIALIZED_AGENT_TOOLS: Dict[str, List[Dict[str, str]]] = {
+    "factor_agent_tool": [
+        {
+            "name": "Panel_characteristics_downsample",
+            "description": "Down-samples or filters characteristic by selected calendar months.",
+        },
+        {
+            "name": "Panel_characteristics_fill",
+            "description": "If values are not available, then sequentially fill from list of panels in order.",
+        },
+        {
+            "name": "Panel_sequence",
+            "description": "Compute the cumulative number of available data points for each stock observation",
+        },
+        {
+            "name": "Panel_winsorize",
+            "description": "Winsorize panel values using optional reference weights and percentile cutoffs.",
+        },
+        {
+            "name": "Panel_digitize",
+            "description": "Discretize panel observations into categories with optional masking and ordering controls.",
+        },
+        {
+            "name": "Panel_portfolio_turnover",
+            "description": "Measure turnover by imputing drifted portfolio weights with optional return inputs.",
+        },
+        {
+            "name": "Panel__portfolio_weights",
+            "description": "Construct portfolio weights from raw scores or stock characteristics with optional masking and leverage scaling.",
+        },
+    ],
+    "performance_agent_tool": [
+        {
+            "name": "Panel_performance_evaluation",
+            "description": "Summarize risk and performance statistics for a returns panel.",
+        },
+        {
+            "name": "Panel_portfolio_returns",
+            "description": "Generate portfolio or factor returns from portfolio weights or factor characteristic panels.",
+        },
+        {
+            "name": "Panel_plot",
+            "description": "Render and persist plots for one or two panels with configurable plot type and title.",
+        },
+    ],
+}
+
+def _summarize_tools(functions: List[Callable[..., str]]) -> List[Dict[str, str]]:
+    """Return name/description metadata for the provided MCP tool callables."""
+
+    summaries: List[Dict[str, str]] = []
+    for func in functions:
+        doc = (func.__doc__ or "").strip()
+        description = doc.splitlines()[0] if doc else ""
+        summaries.append({"name": func.__name__, "description": description})
+    return summaries
+
+
+def _server_tool_metadata() -> List[Dict[str, str]]:
+    """Collect metadata for MCP tools defined in this server module."""
+
+    tool_functions: List[Callable[..., str]] = [
+        # Panel_matmul,
+        Panel_add,
+        Panel_radd,
+        Panel_sub,
+        Panel_rsub,
+        Panel_mul,
+        Panel_rmul,
+        Panel_truediv,
+        Panel_rtruediv,
+        Panel_eq,
+        Panel_ne,
+        Panel_lt,
+        Panel_le,
+        Panel_gt,
+        Panel_ge,
+        Panel_or,
+        Panel_and,
+        Panel_neg,
+        Panel_invert,
+        Panel_filter,
+        Panel_log,
+        Panel_exp,
+        Panel_shift
+    ]
+    return _summarize_tools(tool_functions)
+
+
+@mcp.tool()
+def get_specialized_agent_tools() -> str:
+    """Return specialized and shared MCP tools accessible to planner workflows."""
+
+    payload = {
+        "agents": SPECIALIZED_AGENT_TOOLS,
+        "server": _server_tool_metadata(),
+        "notes": "Each entry lists the tools callable by a specialized agent tool plus shared server MCP tools they may invoke.",
+    }
+    return json.dumps(payload)
+
+
 
 
 import pandas as pd
@@ -100,6 +305,7 @@ def weighted_average(x):
 # """
 #     log_message(f"\\nExecuting code for Panel_weighted_average:\\n{code}\\n")
 #     return execute_in_sandbox(code)
+
 # @mcp.tool()
 # def Panel_spread_portfolios(panel_id: str, weights_panel_id: str | int | float = '') -> str:
 #     """
@@ -126,31 +332,6 @@ def weighted_average(x):
 #
 # Specialized Functions 
 #
-# @mcp.tool()
-# def Panel_isin(panel_id: str | int | float, values: list) -> str:
-#     """
-#     Create a Panel that filters the rows of the given panel data 
-#     to indicate those with values in the provided list.
-#     Args:
-#         panel_id (str): The id of the panel data to filter.
-#         values (list): A list of values to filter the panel data by.
-#     Returns:
-#         str: the id of the created Panel in the cache in JSON format
-#     """
-#     code = f"""
-# import json
-# from qrafti import Panel, panel_or_numeric
-# import pandas as pd
-# p1 = panel_or_numeric('{panel_id}', **{dates_})
-# p2 = p1.apply(pd.DataFrame.isin, values={values}).persist()
-# print(json.dumps({{'result_panel_id': p2.name, 'metadata': p2.info}}))
-# """
-#     log_message(f"\nExecuting code for Panel_isin:\n{code}\n")
-#     return execute_in_sandbox(code)  
-#        {
-#            "name": "Panel_isin",
-#            "description": "Create a boolean mask panel indicating rows whose values appear in a provided list.",
-#        },
 # {
 #     "name": "Panel_spread_portfolios",
 #     "description": "Construct long-short spread portfolio weights between highest and lowest quantiles, using optional weights.",
@@ -201,6 +382,57 @@ country_dict = {
 }
 
 """
+
+'''
+class PortfolioEvaluation:
+    """Evaluate the performance of a portfolio DataFrame
+        if portfolio.nlevels != 2:
+            raise ValueError("PortfolioEvaluation requires a Panel with 2 index levels (date, stock)")
+        PortfolioEvaluation(portfolio.frame)
+    """
+
+    def __init__(self, portfolio: pd.DataFrame):
+        if portfolio.nlevels != 2:
+            raise ValueError("PortfolioEvaluation requires a Panel with 2 index levels (date, stock)")
+        self.portfolio = portfolio
+
+    def turnover(self, ret: Panel) -> Panel:
+        """Compute the turnover of the portfolio as the sum of absolute changes in weights.
+        Arguments:
+            ret: Panel of leading returns to compute drifted portfolio weights
+        Returns:
+            Panel of turnover values for each date
+        """
+        # shift both portfolio and returns by 1 period to align
+        ret = ret.shift_dates(shift=1)
+        shifted_portfolio = self.portfolio.shift_dates(shift=1)
+
+        # left join shifted portfolio with 1 + returns, and multiply to get drifted weights
+        df = shifted_portfolio.join_frame(ret + 1, fillna=1, how='left')
+        df.iloc[:, 0] = df.iloc[:, 0] * df.iloc[:, 1]  # drift weights by returns
+        shifted_portfolio.set_frame(df.iloc[:, [0]])  # update shifted portfolio weights
+
+        # join original portfolio with drifted portfolio weights
+        df = self.portfolio.join_frame(shifted_portfolio, fillna=0, how='left')
+
+        # compute turnover as sum of absolute changes in weights
+        turnover = df.groupby(level=0).apply(lambda x: (x.iloc[:, 0] - x.iloc[:, -1]).abs().sum())
+
+        return Panel().set_frame(turnover)
+    
+    
+    def information_coefficient(self, ret: Panel) -> Panel:
+        """Compute the Information Coefficient (IC) of the factor against the given returns.
+        Arguments:
+            ret: Panel of returns to compute IC against
+        Returns:
+            Panel of IC values for each date
+        """
+        def ic_func(x):
+            return x.iloc[:, 0].corr(x.iloc[:, 1])
+        return self.portfolio.apply(ic_func, ret, fillna=0)
+'''
+
 TODO:
 - def TimeFrame.performance(): annualized return, volatility, sharpe ratio, max drawdown
 - def Panel.turnover()

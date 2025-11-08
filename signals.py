@@ -153,6 +153,9 @@ def load_panel_csv(filename: str | Path,
     df_data.index.names = (DATE_NAME, STOCK_NAME)
 
     for i, col in tqdm(enumerate(keep), total=len(keep)):
+        if col not in df_data.columns:
+            print(f"  - Skipping {col} as not in data")
+            continue
         df = df_data[[col]].dropna().convert_dtypes()
         panel = Panel(col)
         print(panel.name, len(panel), panel.nlevels)
@@ -170,6 +173,7 @@ def load_panel_csv(filename: str | Path,
 # load_csv - FF factor returns
 #
 #################
+import io
 def load_csv(filename: str | Path, 
              date_name: str,
              sep: str,
@@ -183,20 +187,30 @@ def load_csv(filename: str | Path,
 #     sep = '\t'
 #     keep=['Mkt-RF', 'HML']
 
-    df_data = pd.read_csv(filename, sep=sep, header=0, low_memory=False)
-    if not keep:
-        keep = list(set(df_data.columns) - {date_name})
-
     ### TO DO: Handle dates not in calendar, esp different month end dates
     cal = Calendar()
-    df_data[date_name] = cal.as_dates(df_data[date_name])
-    dates = df_data[date_name].unique()
+    # read all lines from filename, and check if first work of every line is a date
+    with open(filename, 'r') as f:
+        lines = f.readlines()
+    date_lines = []
+    for line in lines:
+        words = line.strip().split(sep)
+        if (len(words) == 0): 
+            continue
+        if cal.as_dates(words[:1])[0] in cal.dates.index or (words[0] == '' and len(words)>2):
+            date_lines.append(line)
+    # read lines as CSV into data frame
+    df_data = pd.read_csv(io.StringIO(''.join(date_lines)), sep=sep, header=0, index_col=0, low_memory=False)
+    #df_data = pd.read_csv(filename, sep=sep, header=0, low_memory=False)
+    if not keep:
+        keep = list(set(df_data.columns))
+    df_data.index = cal.as_dates(df_data.index.tolist())
+    dates = df_data.index.unique()
     print('Dates not in calendar:', sorted(set(dates) - set(cal.dates.index)))
-    df_data = df_data[df_data[date_name].isin(cal.dates.index)]
+    df_data = df_data[df_data.index.isin(cal.dates.index)]
 
     for i, col in tqdm(enumerate(keep), total=len(keep)):
-        df = df_data[[date_name, col]].dropna().convert_dtypes()
-        df.set_index(date_name, inplace=True)
+        df = df_data[col].dropna().astype(float)
         df.index.name = DATE_NAME
         panel = Panel(col)
         print(panel.name, len(panel), panel.nlevels)
@@ -282,53 +296,86 @@ def load_crsp(filename: str | Path,
         panel = Panel(col).set_frame(df, append=False).persist(col)
         print(panel.name, len(panel), panel.nlevels)
 
-    # Identify universe of stocks, and assign into size deciles based on stocks with exchcd == 1 (NYSE)
+    df = df_data.loc[universe_, [date, 'PERMNO', 'CAP', 'EXCHCD']].set_index([date, 'PERMNO']).sort_index()
+    df.index.names = (DATE_NAME, STOCK_NAME)
+
+    # Compute and persist total market cap and count of stocks in universe
+#    cap_df = df.groupby(level=0).apply(np.sum, axis=0)['CAP'].rename('TOTAL_CAP')
+    cap_df = df.groupby(level=0).apply(pd.DataFrame)
+    panel = Panel().set_frame(cap_df, append=False).persist('TOTAL_CAP')
+    count_df = df.groupby(level=0).apply(len).rename('TOTAL_COUNT')
+    panel = Panel().set_frame(count_df, append=False).persist('TOTAL_COUNT')
+
+    # Assign into size deciles based on stocks with exchcd == 1 (NYSE)
     def deciles(x: pd.DataFrame) -> pd.DataFrame:
-        """Assign x['CAPCO'] into descending decile ranks using break points where x['EXCHCD'] is 1 (NYSE)"""
-        #x = x.sort_values('CAPCO', ascending=True)
+        """Assign x['CAP'] into descending decile ranks using break points where x['EXCHCD'] is 1 (NYSE)"""
+        #x = x.sort_values('CAP', ascending=True)
         nyse_ = x['EXCHCD'] == 1
-        breakpoints = x.loc[nyse_, 'CAPCO'].quantile(np.linspace(0, 1, 11)).values
+        breakpoints = x.loc[nyse_, 'CAP'].quantile(np.linspace(0, 1, 11)).values
         breakpoints[0] = -np.inf
         breakpoints[-1] = np.inf
         #print(len(x), x.iloc[0], breakpoints)
-        ranks = pd.cut(x['CAPCO'], bins=breakpoints, labels=range(10,0,-1), include_lowest=True)
+        ranks = pd.cut(x['CAP'], bins=breakpoints, labels=range(10,0,-1), include_lowest=True)
         return ranks.astype(int)   # decile ranks from 1 (largest) to 10 (smallest)
-
-    df = df_data.loc[universe_, [date, 'PERMNO', 'CAPCO', 'EXCHCD']].set_index([date, 'PERMNO']).sort_index()
-    df = df.groupby(level=0).apply(deciles).rename('SIZE_DECILE')
-    while df.index.nlevels > 2:
-        df = df.reset_index(level=0, drop=True)
-    panel = Panel().set_frame(df, append=False).persist('SIZE_DECILE')
+    size_df = df.groupby(level=0).apply(deciles).rename('SIZE_DECILE')
+    while size_df.index.nlevels > 2:
+        size_df = size_df.reset_index(level=0, drop=True)
+    panel = Panel().set_frame(size_df, append=False).persist('SIZE_DECILE')
     print(panel.name, len(panel), panel.nlevels)
+
+    # Value weights capped at 80th percentile of NYSE stocks
+    def capvw(x: pd.DataFrame) -> pd.DataFrame:
+        """Cap x['CAP'] where SIZE_DECILE <= 2 at 80th percentile of NYSE stocks"""
+        breakpoint = x.loc[x['SIZE_DECILE'] <= 2, 'CAP'].min()
+        return x['CAP'].clip(upper=breakpoint)
+    
+    capvw_df = pd.concat([df[['CAP']], size_df], axis=1).groupby(level=0).apply(capvw)
+    while capvw_df.index.nlevels > 2:
+        capvw_df = capvw_df.reset_index(level=0, drop=True)
+    panel = Panel().set_frame(capvw_df, append=False).persist('CAPVW')
+    print(panel.name, len(panel), panel.nlevels)
+
+
+
     
 
 if __name__ == '__main__':
 
     # Load Fama-French factors
-    #load_csv(DATA_LAKE / 'FF.csv', date_name='Date', sep='\t', 
-    #         mul=0.01, append=False, keep=['Mkt-RF', 'HML'])
+#    filename = 'F-F_Research_Data_Factors.csv'
+#    keep = ['Mkt-RF', 'HML', 'SMB', 'HML', 'RF']
+#    filename = 'F-F_Research_Data_5_Factors_2x3.csv'
+#    keep = ['RMW', 'CMA']
+#    load_csv(DATA_LAKE / filename, date_name='', sep=',', 
+#             mul=0.01, append=False, keep=keep)
 
-    # Load CRSP monthly data
-    restrict_universe = True
-    load_crsp(DATA_LAKE / 'crsp.txt.gz', date='date', sep='\t', restrict_universe=restrict_universe)
+    # Compute stock excess returns EXCRET = RET - RF
+    # ret = Panel('RET')
+    # rf = Panel('RF')
+    # Panel('EXCRET').set_frame((ret.frame.iloc[:,0] - rf.frame.iloc[:,0]).dropna()).persist('EXCRET')
+    # # Load CRSP monthly data
+    # restrict_universe = True
+    # load_crsp(DATA_LAKE / 'crsp.txt.gz', date='date', sep='\t', restrict_universe=restrict_universe)
 
     # Load PSTAT annual data
-    stock_name = 'gvkey'   # 'LPERMNO'
-    date_name = 'datadate'
-    sep = '\t'
-    keep = ['txditc', 'seq', 'pstk', 'pstkrv', 'pstkl']
-    filter = dict(indfmt = 'INDL', datafmt = 'STD', curcd = 'USD', popsrc = 'D', consol = 'C')
-    aged = 2
+#     stock_name = 'gvkey'   # 'LPERMNO'
+#     date_name = 'datadate'
+#     sep = '\t'
+#     keep = ['txditc', 'seq', 'pstk', 'pstkrv', 'pstkl']
+#     keep = ['act', 'ebitda', 'ch', 'ebit', 'oiadp', 'caps', 'xsga']
+#     filter = dict(indfmt = 'INDL', datafmt = 'STD', curcd = 'USD', popsrc = 'D', consol = 'C')
+#     aged = 2
 
-    append = False  # to start loop over input files
-    for subname in ['']:  #['2020', '2010']:
-        filename = PSTAT_DATA / f"annual{subname}.txt.gz"
-#        filename = DATA_LAKE / f"annual{subname}.txt.gz"
-        load_panel_csv(filename, stock_name=stock_name, date_name=date_name, 
-                       append=append, sep=sep, keep=keep, aged=aged, filter=filter)
-        append = True
+#     append = False  # to start loop over input files
+#     for subname in ['']:  #['2020', '2010']:
+#         filename = PSTAT_DATA / f"annual{subname}.txt.gz"
+# #        filename = DATA_LAKE / f"annual{subname}.txt.gz"
+#         load_panel_csv(filename, stock_name=stock_name, date_name=date_name, 
+#                        append=append, sep=sep, keep=keep, aged=aged, filter=filter)
+#         append = True
 
 # For 
 #for filename in tqdm(sorted((DATA_LAKE / 'USA').glob('19[8765432]*.txt.gz'), reverse=True)):
 #    print(f"Loading {filename}")
 #    load_panel_csv(filename, stock_name=STOCK_NAME, date_name=DATE_NAME, age=False, sep='\t')
+    pass

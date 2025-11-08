@@ -8,6 +8,8 @@ import json
 from typing import List, Dict, Union, Set, Any, Tuple, Callable
 from datetime import datetime
 import time
+import markdown
+from weasyprint import HTML
 
 import pandas as pd
 from pandas.api.types import is_list_like, is_integer_dtype, is_scalar, is_numeric_dtype, is_float_dtype
@@ -23,7 +25,49 @@ MEDIA = DATA_LAKE / 'media'
 
 STOCK_NAME = 'permno'
 DATE_NAME = 'eom'
-UNIVERSE_PANEL = 'SIZE_DECILE' # 'ret_exc_lead1m'
+CALENDAR_PANEL = 'TOTAL_COUNT' # 'ret_exc_lead1m'
+
+CRSP_VERSION = False
+DATES = dict(start_date='2020-01-01', end_date='2024-12-31')
+
+research_prompt = f"""You are a sell-side quantitative researcher writing a captivating research memo
+on this new financial signal for predicting stock returns. You should also provide a title name for the signal.
+
+Please follow these guidelines for writing the research memo:
+
+1. Motivation (1 paragraph, ~100 words): 
+    * Broad statement on market efficiency or asset pricing. 
+    * Identify a gap in the current practice and literature.
+    * Use active voice and declarative statements.
+
+2. Hypothesis Development (1 paragraph, ~150 words):
+    * Present economic mechanisms linking signal to returns.
+    * Draw on theoretical frameworks.
+    * Support claims with citations.
+
+3. Results Summary (1-2 paragraphs, ~200 words):
+    * Lead with the strongest statistical finding.
+    * Summarize the key results in a narrative form, including economic significance.
+    * Do not merely cite numbers; interpret them.
+
+4. Contribution (1 paragraph, ~150 words):
+    * Position relative to 3-4 related finance/accounting journal articles.
+    * Highlight methodological innovations.
+
+In your writing, please:
+
+* Use active voice (e.g., “We find”).
+* Maintain clarity and conciseness.
+* Avoid jargon; explain technical terms.
+* Use present tense for established findings.
+* Use past tense for specific results.
+* Make clear distinctions between correlation and causation.
+* Avoid speculation beyond the data.
+
+Output in markdown format with sections: Introduction, Hypothesis Development, Results, Contribution.
+
+Base the results section strictly on the following data, matching its terminology and precision:
+"""
 
 
 ###########################
@@ -105,11 +149,11 @@ class DataCache:
 # should inject "Compustat Annual" for all pstat variables -> "Source: Compustat Annual" etc
 
 def load_variables(filenames = ['PSTAT.csv', 'JKP.csv'], 
-                   data_path: Path = DATA_LAKE,
-                   crsp: bool = True) -> pd.DataFrame:
+                   data_path: Path = DATA_LAKE) -> pd.DataFrame:
     """Read names, types and descriptions file"""
-    keep_list = {'RET', 'RETX', 'PRC', 'VOL', 'SICCD', 'pstkrv','pstkl','pstk','seq','txditc','ret_12_1'}
-    if crsp:
+    keep_list = {'RET', 'RETX', 'PRC', 'VOL', 'SICCD', 'pstkrv','pstkl','pstk','seq','txditc','ret_12_1',
+                 'HML', 'RF', 'Mkt-RF', 'RMW', 'CMA', 'SMB'}
+    if CRSP_VERSION:
         keep_list |= {'CAPCO', 'CAP', 'SIZE_DECILE', 'SHRCD', 'EXCHCD', 'SIZE_DECILE'}
     else:  # should be different length, to trigger recreation
         keep_list |= {'me','me_company','size_grp','crsp_shrcd','crsp_exchcd'}
@@ -131,7 +175,17 @@ def load_variables(filenames = ['PSTAT.csv', 'JKP.csv'],
                                                 'Exchange Code (1=NYSE, 2=AMEX, 3=NASDAQ)' + suf,
                                                 'Standard Industrial Classification Code' + suf,
                                                 'Size Decile Classification (1=Largest, 10=Smallest)' + suf]})
-        df_list = [df]
+        suf = ' [Source: Fama-French Research Factors]'
+        bench = pd.DataFrame(index=['HML', 'RF', 'Mkt-RF', 'RMW', 'CMA', 'SMB'],
+                             data={'Type': ['float']*6,
+                                   'Description': ['HML Value benchmark returns' + suf,
+                                                   'RF risk free rate' + suf,
+                                                   'Market excess returns' + suf,
+                                                   'RMW Quality benchmark returns' + suf,
+                                                   'CMA Investment benchmark returns' + suf,
+                                                   'SMB Size benchmark returns' + suf]})
+                                                   
+        df_list = [df, bench]
         for filename in filenames:
             df = pd.read_csv(data_path / filename, sep='\t', index_col=0, header=0)
             df.columns = ['Type', 'Description']
@@ -144,6 +198,7 @@ def load_variables(filenames = ['PSTAT.csv', 'JKP.csv'],
         df.index.name = 'Name'
     
         # keep only rows with index value in keep_list
+        print(keep_list)
         df = df[df.index.isin(keep_list)]
         df.to_csv(data_path / 'characteristics.csv', sep='\t')
     return df
@@ -173,7 +228,7 @@ def run_code_in_subprocess(code_str):
 #
 ###########################
 class Calendar:
-    def __init__(self, start_date: str = '', end_date: str = '', reference_panel: str = UNIVERSE_PANEL):
+    def __init__(self, start_date: str = '', end_date: str = '', reference_panel: str = CALENDAR_PANEL):
         # Initialize the Calendar with unique sorted dates from a reference Panel 'ret_exc_lead1m'
         dates = Panel(reference_panel).frame.index.get_level_values(0)
         if start_date:
@@ -188,10 +243,10 @@ class Calendar:
 
     def as_dates(self, dates: List) -> List[str]:
         """Converts a list of dates to valid dates in the calendar."""
-        dates_dict = {d[:4]+d[5:7]: d for d in self.dates.index}
-        dates_dict |= {int(d): date for d, date in dates_dict.items()}
-        dates_dict |= {int(d[:4]+d[5:7]+d[8:10]): d for d in self.dates.index}
-        #dates_dict |= {d:d for d in self.dates.index}
+        dates_dict = {d[:4]+d[5:7]: d for d in self.dates.index}    # 'YYYYMM'
+        dates_dict |= {int(d): date for d, date in dates_dict.items()}  # int YYYYMM
+        dates_dict |= {int(d[:4]+d[5:7]+d[8:10]): d for d in self.dates.index}  # int YYYYMMDD
+        dates_dict |= {d:d for d in self.dates.index}
         return [dates_dict.get(d, str(d)) for d in dates]
 
     def dates_shifted(self, shift: int = 1) -> Dict[str, str]:
@@ -231,6 +286,43 @@ class Calendar:
 #
 ###########################
 
+# Utility functions for Panels
+def frame_info(frame: pd.DataFrame) -> Dict[str, Any]:
+    """Return basic information about a DataFrame."""
+    return frame.groupby(level=0).size().to_dict()
+
+def panel_or_numeric(x: str, **kwargs) -> Union['Panel', float, int]:
+    """Convert a string to a Panel or numeric value."""
+    if x is None or x.lower() in ['', 'none']:
+        return None
+    try:
+        if '.' in x:
+            return float(x)
+        else:
+            return int(x)
+    except:
+        return Panel(x, **kwargs)
+
+# TO DO: All date and vulnerable str arguments for Panel methods should be converted using str_or_None
+def str_or_None(x: str) -> Union[str, None]:
+    """Convert a string to None if it is 'None' or empty."""
+    if x is None or x.lower() in ['', 'none']:
+        return None
+    return x
+
+def numeric_or_None(x: str) -> Union[float, None]:
+    """Convert a string to float or None if it is 'None' or empty."""
+    try:
+        return float(x)
+    except:
+        return None
+
+def int_or_None(x: str) -> Union[float, None]:
+    """Convert a string to float or None if it is 'None' or empty."""
+    try:
+        return int(float(x))
+    except:
+        return None
 
 class Panel:
     """
@@ -240,7 +332,7 @@ class Panel:
     operations on the panel data.
     """
 
-    def __init__(self, name: str = '', start_date: str = '', end_date: str = ''):
+    def __init__(self, name: str = '', start_date: str = DATES['start_date'], end_date: str = DATES['end_date']):
         """Initialize a Panel, optionally from a cached DataFrame file and date range.
 
         Arguments:
@@ -264,7 +356,8 @@ class Panel:
         return 0 if self._frame is None else len(self._frame)
     
     def __str__(self) -> str:
-        return json.dumps({'results_panel_id': self.name, 'meta': self.info}, indent=2)
+        return json.dumps({'results_panel_id': self.name}, indent=2)
+    # return json.dumps({'results_panel_id': self.name, 'meta': self.info}, indent=2)
 
     @property
     def frame(self) -> pd.DataFrame:
@@ -277,6 +370,7 @@ class Panel:
     def info(self) -> Dict[str, Any]:
         """Return basic information about this Panel."""
         info = {'nlevels': self.nlevels, 'rows': len(self)}
+        info['memory_usage_bytes'] = 0 if self.nlevels < 0 else int(self.frame.memory_usage(deep=True).sum())
         if self.nlevels >= 1:
             dates = self.dates
             info['num_dates'] = len(dates)
@@ -285,7 +379,6 @@ class Panel:
         if self.nlevels == 2:
             info['max_stocks_per_date'] = int(self.frame.groupby(level=0).size().max())
             info['min_stocks_per_date'] = int(self.frame.groupby(level=0).size().min())
-        info['memory_usage_bytes'] = 0 if self.nlevels < 0 else int(self.frame.memory_usage(deep=True).sum())
         return info
 
     @property
@@ -398,6 +491,24 @@ class Panel:
     def set_name(self, name: str) -> 'Panel':
         """Set the name of this Panel."""
         self.name = name
+        if isinstance(self._frame, pd.DataFrame):
+            self._frame.columns = [name]
+        return self
+    
+    def set(self, value: int | float, index: 'Panel' = None) -> 'Panel':
+        """Set values in this Panel at the specified index positions.
+        Arguments:
+            index: A Panel specifying the index positions to set (must have same index levels)
+            value: The value(s) to set at the specified index positions (scalar or Panel)
+        Returns:
+            self: This Panel with updated values
+        """
+        if not index:
+            self._frame = pd.DataFrame(value, index=[''], columns=[''])
+            self._frame.index.name = None
+        else:
+            self._frame = pd.DataFrame(value, index=index.frame.index, columns=[''])
+            self._frame.index.names = [DATE_NAME, STOCK_NAME][:index.nlevels]
         return self
     
     def set_frame(self, frame: pd.DataFrame, append=False) -> 'Panel':
@@ -450,7 +561,7 @@ class Panel:
 
     def astype(self, dtype) -> 'Panel':
         """Change the dtype of the values of this Panel."""
-        if self.nlevels >= 0:
+        if isinstance(self._frame, pd.DataFrame):
             self._frame = self._frame.astype(dtype)
         return self
 
@@ -678,19 +789,17 @@ class Panel:
             out_panel._frame = df.set_index([DATE_NAME, STOCK_NAME][:nlevels]).sort_index(level=list(range(nlevels)))
         return out_panel
 
-    def filter(self, min_value: float = None, max_value: float = None, isin: List = None,
+    def filter(self, min_value: float = None, max_value: float = None,
                start_date: str = None, end_date: str = None, 
                dropna: bool = False, mask: 'Panel' = None, index: 'Panel' = None,
-               stocks: List[int] = None, min_stocks: int = None) -> 'Panel':
+               min_stocks: int = None) -> 'Panel':
         """Filter the values of this Panel based on date, stock, and value criteria.
         Arguments:
             start_date: Optional start date to filter the DataFrame (inclusive)
             end_date: Optional end date to filter the DataFrame (inclusive)
-            stocks: Optional list of stocks to filter the DataFrame
             min_stocks: Optional minimum number of stocks per date to keep the date
             min_value: Optional minimum value to keep the row
             max_value: Optional maximum value to keep the row
-            isin: Optional list of values to keep the row
             mask: Optional Panel of boolean values to filter the DataFrame
             index: Optional Panel whose index to keep in the DataFrame
             dropna: If True, drop rows with NaN values
@@ -700,19 +809,19 @@ class Panel:
         out_panel = self.copy()
         if self.nlevels < 1:   # empty or scalar
             return out_panel
-        df = self.frame
+        df = self._frame.copy()
+        start_date = str_or_None(start_date)
         if start_date:
             df = df[df.index.get_level_values(0) >= start_date]
+        end_date = str_or_None(end_date)
         if end_date:
             df = df[df.index.get_level_values(0) <= end_date]
-        if stocks:
-            df = df[df.index.get_level_values(1).isin(stocks)]
+        min_value = numeric_or_None(min_value)
         if min_value is not None:
             df = df[df.iloc[:, 0] >= min_value]
+        max_value = numeric_or_None(max_value)
         if max_value is not None:
             df = df[df.iloc[:, 0] <= max_value]
-        if isin is not None:
-            df = df[df.iloc[:, 0].isin(isin)]
         if dropna:
             df = df[df.iloc[:, 0].notna()]
         if isinstance(mask, Panel) and mask.nlevels == self.nlevels:
@@ -729,6 +838,7 @@ class Panel:
                 raise ValueError("Cannot apply index Panel with different index levels")
             df = df.join(index_df, how='inner', rsuffix='_index')
             df = df.iloc[:, :-1]  # drop the index column
+        min_stocks = numeric_or_None(min_stocks)
         if is_numeric_dtype(min_stocks) and self.nlevels == 2:
             counts = df.groupby(level=0).size()
             valid_dates = counts[counts >= min_stocks].index
@@ -749,25 +859,6 @@ class Panel:
             if 'y' not in kwargs:
                 kwargs['y'] = df.columns[1]
         df.plot(**kwargs)
-
-#
-# Utility functions for Panels
-#
-def frame_info(frame: pd.DataFrame) -> Dict[str, Any]:
-    """Return basic information about a DataFrame."""
-    return frame.groupby(level=0).size().to_dict()
-
-def panel_or_numeric(x: str, **kwargs) -> Union[Panel, float, int]:
-    """Convert a string to a Panel or numeric value."""
-    if x is None or x in ['', 'None']:
-        return None
-    try:
-        if '.' in x:
-            return float(x)
-        else:
-            return int(x)
-    except:
-        return Panel(x, **kwargs)
 
 
 #
@@ -819,7 +910,8 @@ def digitize(x, cuts: int | List[float], ascending: bool = True) -> pd.Series:
 def portfolio_weights(x, leverage: float = 1.0, net: bool = True) -> pd.Series:
     """Scale the the portfolio weights to sum to the given leverage
     Arguments:
-        x: DataFrame with initial portfolio weights
+        x: DataFrame with at least two columns, first column is the raw portfolio weights,
+           last column is a boolean indicator for which rows to consider for scaling
         leverage: Total leverage to scale the weights to
         net: If False, scale the average of the sum of absolute long and short weights to the leverage.  
              If True (default), scale the absolute sum of weights to the leverage. 
@@ -828,6 +920,8 @@ def portfolio_weights(x, leverage: float = 1.0, net: bool = True) -> pd.Series:
     Usage:
         panel_frame.apply(portfolio_weights, leverage=leverage, net=False)
     """
+    # set weights to zero for rows where second column is False
+    x.loc[~x.iloc[:, 1].astype(bool), x.columns[0]] = 0.0
     long_weight = x.loc[x.iloc[:,0] > 0, x.columns[0]].sum()
     short_weight = x.loc[x.iloc[:,0] < 0, x.columns[0]].sum()
     if net:
@@ -900,10 +994,12 @@ def characteristics_fill(*panels, replace: List = []) -> Panel:
         out_panel = out_panel.apply(replace_helper, panel, how='outer', fill_value=np.nan, replace=replace)
     return out_panel
 
-def characteristics_downsample(characteristics: Panel, month: List | int = []) -> Panel:
+def characteristics_downsample(characteristics: Panel, ffill: bool=True, month: List | int = []) -> Panel:
     """Downsamples characteristics values at lower frequency of a specific months
     Arguments:
         characteristics: Panel of characteristics values
+        ffill (optional, bool): If True, forward fill values between months.  
+          If False, only use values in the specified months.
         month: List of months (1-12) to extract downsamples for, if empty, extract for all months
     Returns:
         Panel of characteristics values at the specified date, forward filled from previous dates
@@ -918,10 +1014,11 @@ def characteristics_downsample(characteristics: Panel, month: List | int = []) -
         if not month or cal.ismonth(next_date, month):
             for curr_date in cal.dates_range(prev_date, next_date):
                 if curr_date in characteristics_dates:
-                    characteristics_df = characteristics.frame.xs(curr_date, level=0).reset_index()
-                    characteristics_df[DATE_NAME] = next_date
-                    characteristics_df['_date_'] = curr_date
-                    samples_df.append(characteristics_df)
+                    if ffill or next_date == curr_date:
+                        characteristics_df = characteristics.frame.xs(curr_date, level=0).reset_index()
+                        characteristics_df[DATE_NAME] = next_date
+                        characteristics_df['_date_'] = curr_date
+                        samples_df.append(characteristics_df)
             prev_date = cal.offset(next_date, 1, strict=True)
 
     # sort by STOCK_NAME, DATE_NAME and _date_ and drop duplicates, keep last
@@ -951,8 +1048,10 @@ def portfolio_impute(port_weights: Panel, retx: Panel = None,
     """
     assert port_weights.nlevels == 2, "Portfolio weights must have two index levels"
     if retx is None:
-        #retx = Panel('ret_exc_lead1m').shift(1)
-        retx = Panel('RETX')   # RETX should be actual dates, for drifting previous weights only
+        if CRSP_VERSION:
+            retx = Panel('RETX')   # RETX should be actual dates, for drifting previous weights only
+        else:
+            retx = Panel('ret_exc_lead1m').shift(1)
     portfolio_dates = port_weights.dates
     cal = Calendar(start_date=portfolio_dates[0], end_date=portfolio_dates[-1])
     all_dates = cal.dates_range(cal.start_date, cal.end_date)
@@ -1016,44 +1115,194 @@ def portfolio_returns(port_weights: 'Panel', price_changes: 'Panel' = None,
         Panel of portfolio returns, shifted by one date to align with end of holding period
     """
     if stock_returns is None:
-    #    stock_returns = Panel('ret_exc_lead1m')
-        stock_returns = Panel('RET')  
-    stock_returns = stock_returns.shift(-1)  # RET should be leading dates, to compute realized returns
+        if CRSP_VERSION:
+            stock_returns = Panel('EXCRET').shift(-1)  # should be leading dates, to compute realized returns
+        else:
+            stock_returns = Panel('ret_exc_lead1m')
 
     port_weights = portfolio_impute(port_weights, retx=price_changes, normalize=True)
     return (port_weights @ stock_returns).shift(1)
 
-def portfolio_evaluation(port_returns: Panel) -> Dict[str, float]:
+def portfolio_metrics(port_returns: Panel) -> Dict[str, float]:
     """Compute summary performance statistics of a portfolio given its weights and returns.
     Arguments:
         port_returns: Panel of portfolio returns
     Returns:
         Dict of summary statistics: mean return, volatility, Sharpe ratio
     """
-    return {} if port_returns.nlevels != 1 else PortfolioEvaluation(port_returns.frame).summary()
+    return {} if port_returns.nlevels != 1 else PortfolioEvaluation(returns=port_returns.frame).metrics()
 
-def show(x):
-    if isinstance(x, int):
-        x = Panel(f'_{x}')
-    elif isinstance(x, str):
-        if not x.startswith('_') and x.isdigit():
-            x = '_' + x
-        x = Panel(x)
-    print(str(x))
-    print(x.frame)
+def portfolio_regression(port_returns: Panel, factor_returns: List[Panel] = []) -> Dict[str, float]:
+    """Compute regression coefficients of a portfolio given its returns and factor returns.
+    Arguments:
+        port_returns: Panel of portfolio returns
+        factor_returns: List of Panel of factor returns
+    Returns:
+        Dict of coefficients and statistics from regression of portfolio returns on intercept and factor returns
+    """
+    if port_returns.nlevels != 1:
+        return {}
+    factor_frames = [factor.frame for factor in factor_returns if factor.nlevels == 1]
+    return PortfolioEvaluation(returns=port_returns.frame).regression(factor_frames)
+
+def factor_evaluate(signal: Panel) -> str:
+    """compute factor returns, evaluation statistics, regression analysis.
+    Arguments:
+        signal: Panel of signal values from which to calculate and evaluate factor returns
+    Returns:
+        str: Evaluation results and tables in markdown format
+    Notes (TO DO): 
+        @mcp.tool 
+        def Panel_factor_evaluate(factor: str) -> str
+        # Creates the prompt and context to respond with the factor evaluation
+    """       
+    context = []
+
+    # Coverage of stocks
+    total_count = Panel('TOTAL_COUNT').filter(index=signal)
+    signal = signal.filter(index=total_count).filter(index=total_count)
+    count_coverage = (signal.filter(index=total_count).apply(len)/total_count).set_name('count')
+
+    # coverage by year
+    df = count_coverage.frame.reset_index()
+    df['year'] = df[DATE_NAME].str.slice(0,4).astype(int)
+    yearly_count = df.groupby('year')['count'].mean().to_frame(name='% of names covered') * 100
+    context.append('### % of Names Covered by Year\n' + yearly_count.round(2).to_markdown())
+
+    # Coverage of cap
+    total_cap = Panel('TOTAL_CAP').filter(index=signal)
+    cap = Panel('CAP').filter(index=signal)
+    cap_coverage = (cap.apply(pd.DataFrame.sum)/total_cap).set_name('cap')
+    df = cap_coverage.frame.reset_index()
+    df['year'] = df[DATE_NAME].str.slice(0,4).astype(int)
+    yearly_cap = df.groupby('year')['cap'].mean().to_frame(name='% of cap covered') * 100
+    context.append('### % of Market Cap Covered by Year\n' + yearly_cap.round(2).to_markdown())
+
+    # Form portfolios
+    quantiles = signal.apply(digitize, fill_value=True, cuts=3)
+    capvw = Panel('CAPVW').filter(index=signal)
+    q3 = capvw.apply(portfolio_weights, reference=quantiles == 3, how='right')
+    q1 = capvw.apply(portfolio_weights, reference=quantiles == 1, how='right')
+    portfolio = q3 - q1
+
+    # turnover
+    #drifted = portfolio_impute(portfolio, drifted=True)
+    #trades = portfolio.filter(index=drifted) - drifted
+    #turnover = trades.apply(pd.DataFrame.abs).apply(pd.DataFrame.sum)/2
+
+    # Evaluate returns
+    returns = portfolio_returns(portfolio)
+    stats = portfolio_metrics(returns)
+    df = pd.Series(stats, name='high-low tercile').to_frame().round(4).T
+    context.append("### Statistics of Tercile Spread Portfolios\n(weighted by market cap winsorized at 80th NYSE percentile")
+    context.append(df.round(4).to_markdown())
+ 
+    # by model
+    context.append("### Alpha, coefficients and t-statistics by Model") 
+    mu = portfolio_regression(returns, [])
+    df = pd.DataFrame({'coefficients': {'intercept': mu['intercept']} | mu['coefficients'],
+                       't-stats': {'intercept': mu['t_intercept']} | mu['t_statistics']}
+                      ).rename_axis(index='Mean Returns')
+    context.append(df.round(4).to_markdown())
+
+    capm = portfolio_regression(returns, [Panel('Mkt-RF')])
+    df = pd.DataFrame({'coefficients': {'intercept': capm['intercept']} | capm['coefficients'],
+                       't-stats': {'intercept': capm['t_intercept']} | capm['t_statistics']}
+                      ).rename_axis(index='CAPM')
+    context.append(df.round(4).to_markdown())
+
+    ff3 = portfolio_regression(returns, [Panel('Mkt-RF'), Panel('SMB'), Panel('HML')])
+    df = pd.DataFrame({'coefficients': {'intercept': ff3['intercept']} | ff3['coefficients'],
+                       't-stats': {'intercept': ff3['t_intercept']} | ff3['t_statistics']}
+                      ).rename_axis(index='Fama-French 3-Factor Model')
+    context.append(df.round(4).to_markdown())
+
+    # Evaluate alphas by size quintile
+    size_decile = Panel('SIZE_DECILE').filter(index=signal)
+    out = []
+    for quintile, sz in enumerate([[1,2], [3,4], [5,6], [7,8], [9,10]]):
+        size_mask = size_decile.apply(pd.DataFrame.isin, values=sz)
+        quantiles_sz = signal.apply(digitize, size_mask, cuts=3)
+        high_sz = Panel().set(1, index=quantiles_sz).apply(portfolio_weights, reference=(quantiles_sz == 3), how='right')
+        low_sz = Panel().set(1, index=quantiles_sz).apply(portfolio_weights, reference=(quantiles_sz == 1), how='right')
+        portfolio_sz = high_sz - low_sz
+        returns_sz = portfolio_returns(portfolio_sz)
+        mu_sz = portfolio_regression(returns_sz)
+        capm_sz = portfolio_regression(returns_sz, [Panel('Mkt-RF')])
+        ff3_sz = portfolio_regression(returns_sz, [Panel('Mkt-RF'), Panel('SMB'), Panel('HML')])
+        out.append(pd.DataFrame([mu_sz['intercept'], mu_sz['t_intercept'], 
+                                 capm_sz['intercept'], capm_sz['t_intercept'], 
+                                 ff3_sz['intercept'],  ff3_sz['t_intercept']],
+                                index=['mean', 't-stat', 
+                                       'alpha (CAPM)', 't-stat (CAPM)', 
+                                       'alpha (FF3)', 't-stat (FF3)'],
+                                columns=[f'Size Quintile {quintile+1}']))
+    df = pd.concat(out, axis=1).rename_axis(index='Model')
+    context.append("### Alpha and t-statistics by Model and Size Quintile\n(lower quintiles have smaller market cap)")
+    context.append(df.round(4).to_markdown())
+
+    context = "\n\n".join(context)
+    return context
+
+
+def markdown_to_pdf(markdown_text: str, stylesheets: List[str] = ['style.css'], 
+                    output_file: str = 'output.pdf', debug: bool = False) -> Dict[str, str]:
+    """Convert markdown text to PDF using WeasyPrint.
+    Arguments:
+        markdown_text: Markdown formatted string
+        stylesheets: List of CSS stylesheet files to apply
+        output_file: Output PDF file name
+        debug: If True, print debug information
+    """
+    import markdown
+    from weasyprint import HTML
+    html_content = markdown.markdown(markdown_text, extensions=['tables'])
+    if debug:
+        print(html_content)
+    html_doc = HTML(string=html_content)
+    html_doc.write_pdf(output_file, stylesheets=stylesheets)
+    return dict(output_file=output_file)
 
 if __name__ == "__main__":
-    tic = time.time()
+    print(load_variables())
+    raise Exception
 
+    def show(x):
+        if isinstance(x, int):
+            x = Panel(f'_{x}')
+        elif isinstance(x, str):
+            if not x.startswith('_') and x.isdigit():
+                x = '_' + x
+            x = Panel(x)
+        print(x.frame)
+        print(str(x))
+
+    def p(x):
+        if isinstance(x, int):
+            return Panel(f'_{x}')
+        elif isinstance(x, str):
+            if not x.startswith('_') and x.isdigit():
+                x = '_' + x
+            return Panel(x)
+        else:
+            raise ValueError("Input must be int or str")
+    tic = time.time()
     print(str(datetime.now()))
 
-#    a = Panel('HML')
-#    b = Panel('HML')
-#    c = a - b
+    dates = DATES
+    dates = dict(start_date='1975-01-01', end_date='2024-12-31')
+    dates = dict(start_date='2020-01-01', end_date='2024-12-31')
 
-#    raise Exception
 
-#if False:    # DO NOT DELETE -- FF
+
+
+#    act = Panel('act', **dates)
+#    ebitda = Panel('ebitda', **dates)
+#    margin = act / ebitda
+
+#    signal = Panel('CAP', **dates)
+
+    # if False:    # DO NOT DELETE -- FF
     # Get Universe
 #    universe = Panel('SIZE_DECILE')
 
@@ -1100,10 +1349,10 @@ if __name__ == "__main__":
 
     # Form intersection
     market_value = Panel('CAP', **dates)
-    BL = market_value.filter(mask=(size_quantiles==2) & (bm_quantiles == 1)).apply(portfolio_weights)
-    BH = market_value.filter(mask=(size_quantiles==2) & (bm_quantiles == 3)).apply(portfolio_weights)
-    SL = market_value.filter(mask=(size_quantiles==1) & (bm_quantiles == 1)).apply(portfolio_weights)
-    SH = market_value.filter(mask=(size_quantiles==1) & (bm_quantiles == 3)).apply(portfolio_weights)
+    BL = market_value.apply(portfolio_weights, reference=(size_quantiles==2) & (bm_quantiles == 1), how='right')
+    BH = market_value.apply(portfolio_weights, reference=(size_quantiles==2) & (bm_quantiles == 3), how='right')
+    SL = market_value.apply(portfolio_weights, reference=(size_quantiles==1) & (bm_quantiles == 1), how='right')
+    SH = market_value.apply(portfolio_weights, reference=(size_quantiles==1) & (bm_quantiles == 3), how='right')
     composite_portfolio = (SH - SL + BH - BL) / 2
 
 #    drifted = portfolio_impute(composite_portfolio, drifted=True)
@@ -1111,12 +1360,12 @@ if __name__ == "__main__":
 #    print(f"Average Turnover: {turnover.apply(np.abs).apply(np.sum, axis=0).apply(np.mean).frame}")
 
     composite_returns = portfolio_returns(composite_portfolio)
-    summary = portfolio_evaluation(composite_returns)
+    summary = portfolio_metrics(composite_returns)
     print(f"Composite Portfolio Summary: {summary}")
 
 #    composite_returns = composite_returns.filter(start_date='1972-01-01')
     bench = Panel('HML', **dates).filter(index=composite_returns)
-    print(portfolio_evaluation(bench))
+    print(portfolio_metrics(bench))
     composite_returns.plot(bench, kind='scatter', title='Composite BM vs HML')
 
     # sort by greatest difference between bench and composite returns
@@ -1130,47 +1379,24 @@ if __name__ == "__main__":
     print(f"Total elapsed time: {toc - tic:.2f} seconds")
     raise Exception
 
-if False:  # DO NOT DELETE -- JKP
-    df = load_variables()
-    print(df)
 
+if False:  # factor evaluate
+    signal = Panel('ret_12_1', **dates)
+
+    description = "12-1 Momentum: Prior 12 month returns excluding most recent month"
+    context = "\n\n".join([description+'\n------------', research_prompt, factor_evaluate(signal)] )
+    with open('output.md', 'w') as f:
+        f.write(context)
+    markdown_to_pdf(context)
+
+    # Sanity plots
+    returns.apply(pd.DataFrame.cumsum).plot(kind='line')
+    (-Panel('SMB', **dates)).apply(pd.DataFrame.cumsum).plot(kind='line')
+    returns.plot(-Panel('SMB', **dates), kind='scatter')
+    plt.show()
     raise Exception
 
-    ret = 'ret_vw_cap'
-    factor = 'ret_12_1'
-    dates = dict(start_date='1975-01-01', end_date='2024-12-31')
-    dates = dict(start_date='2020-01-01', end_date='2024-12-31')
-
-    factor_pf = Panel(factor, **dates)
-
-    size_pf = Panel('me', **dates)
-
-#    nyse_pf = Panel('crsp_exchcd', **dates).apply(pd.DataFrame.isin, values=[1, '1'])
-    nyse_pf = Panel('crsp_exchcd', **dates).filter(isin=[1])
-
-    decile_pf = size_pf.apply(digitize, nyse_pf, cuts=10)
-
-    quantiles_pf = factor_pf.apply(digitize, decile_pf > 2, cuts=3)
-    vwcap_pf = Panel('me', **dates).apply(winsorize, nyse_pf, lower=0, upper=0.80)
-    bench = Panel(factor + '_' + ret, **dates)
-
-    # original approach
-    spreads_pf = quantiles_pf.apply(spread_portfolios, vwcap_pf)
-    portfolio_returns(spreads_pf).plot(bench, kind='scatter')
-
-    # take the difference of two portfolios and construct returns
-    high_pf = vwcap_pf.filter(mask=quantiles_pf == 3).apply(portfolio_weights)
-    low_pf = vwcap_pf.filter(mask=quantiles_pf == 1).apply(portfolio_weights)
-    diff_pf = high_pf - low_pf
-    portfolio_returns(diff_pf).plot(bench, kind='scatter')
-
-    # construct separate returns and take the difference
-    high_ret = portfolio_returns(high_pf)
-    low_ret = portfolio_returns(low_pf)
-    diff_ret = high_ret - low_ret
-    diff_ret.plot(bench, kind='scatter')
-
-if False:
+if False:  # JKP
     print(str(datetime.now()))
 
     # Unit Test 6: pipeline
