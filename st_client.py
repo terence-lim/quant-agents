@@ -37,6 +37,7 @@ log_conversation(mode="w")
 # Settings
 always_show_manager = False
 
+# Cheatsheet and examples for using Panel API, to be injected into coding_agent prompt
 PANEL_CHEATSHEET = """
 You are writing Python that manipulates a custom `Panel` API for cross-sectional/time-series equity data,
 and executing Python code safely in a sandbox using the tools provided to you.
