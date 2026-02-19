@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 import statsmodels.api as sm
 
 class PortfolioEvaluation:
@@ -28,8 +28,8 @@ class PortfolioEvaluation:
             avg_ret = self.returns.mean().values[0] * self.annualization
         return float(avg_ret)
     
-    def sharpe_ratio(self) -> float:
-        """Compute the annualized Sharpe ratio of the portfolio returns."""
+    def information_ratio(self) -> float:
+        """Compute the annualized information ratio of the portfolio returns."""
         vol = self.annualized_volatility()
         if vol == 0:
             return 0.0
@@ -49,8 +49,8 @@ class PortfolioEvaluation:
     def excess_kurtosis(self) -> float:
         """Compute the excess kurtosis of the portfolio returns"""
         return float(self.returns.kurt().values[0])
-    
-    def regression(self, bench: Optional[List[pd.DataFrame]] = None) -> dict:
+
+    def regression(self, bench: Optional[List[pd.DataFrame]] = None) -> Tuple[dict, pd.Series]:
         """Run one multivariate OLS: portfolio ~ const + all benchmarks (independent vars)."""
         bench = bench or []
 
@@ -98,9 +98,8 @@ class PortfolioEvaluation:
             "n_obs": int(res.nobs),
             "r2": float(res.rsquared),
             "adj_r2": float(res.rsquared_adj),
-        }
-    
-    
+        }, res.resid
+
     def metrics(self) -> Dict[str, float]:
         """Compute key portfolio returns performance metrics."""
         return {
@@ -108,10 +107,10 @@ class PortfolioEvaluation:
             'Volatility': self.annualized_volatility(),
             'Skewness': self.skewness(),
             'Excess Kurtosis': self.excess_kurtosis(),
-            'Sharpe Ratio': self.sharpe_ratio(),
+            'Information Ratio': self.information_ratio(),
             'Max Drawdown': self.max_drawdown(),
-            'Number of Observations': len(self.returns),
-            'Start Date': self.returns.index[0],
-            'End Date': self.returns.index[-1],
+            'Num Obs': len(self.returns),
+            'Start Date': self.returns.index[0].strftime('%Y-%m-%d'),
+            'End Date': self.returns.index[-1].strftime('%Y-%m-%d'),
         }
 

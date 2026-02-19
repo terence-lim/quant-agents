@@ -1,3 +1,29 @@
+coding_agent = Agent(
+    name="Coding Agent",
+    model=model,
+    system_prompt=f"""
+You are writing Python that manipulates a custom `Panel` API for cross-sectional/time-series equity data.
+If requested, you may execute Python code safely in a sandbox using the tools provided to you.
+When you are asked to perform a computational task, that means you should write Python to do so and
+return the code you wrote, and then execute the code if also asked to.
+Always consult the Panel API cheat-sheet below before generating or executing code and follow it precisely.
+
+{PANEL_CHEATSHEET}
+
+When responding to the manager:
+- If only asked to write the code but not execute it, then return the code as a JSON text block without executing it.
+- If asked to execute the code, then call the execute_python tool exactly once per attempt and report the result:
+  your code should return in as a JSON str either the name of the final `Panel` you constructed 
+  or a MEDIA file path for any plots by printing it to standard output.
+""".strip(),
+    model_settings={'temperature': 0.0, **model_parameters},
+    toolsets=[coding_server]
+)
+
+
+# You may use the get_characteristics_descriptions tool to look for Panel ids of stocks characteristics,
+# and the get_benchmarks_descriptions tool to look for Panel ids of benchmark factor returns.
+
 # Use 'factor_agent_tool' for tasks involving characteristic preparation, factor construction, quantile sorting,
 # portfolio weighting, and any operations available from the Factor Portfolio Construction Agent such as
 # Panel_isin, Panel_winsorize, Panel_quantiles, Panel_spread_portfolios, and
@@ -33,6 +59,13 @@
 #        max_value: Maximum data value to retain.
 #        isin: Explicit list of acceptable data values.
 #        dropna: If True, drop rows whose values are NaN before persisting.
+
+
+def _log_and_execute(tool_name: str, code: str) -> str:
+    """Helper to log generated code and execute it in the sandbox."""
+    payload = execute_in_sandbox(code)
+    log_message(str(payload), tool_name, code)
+    return payload
 
 # python performance_server.py
 from mcp.server.fastmcp import FastMCP
@@ -228,6 +261,41 @@ def get_specialized_agent_tools() -> str:
         "notes": "Each entry lists the tools callable by a specialized agent tool plus shared server MCP tools they may invoke.",
     }
     return json.dumps(payload)
+
+
+@mcp.tool()
+def Panel_performance_metrics(panel_id: str) -> str:
+    """
+    Compute performance metrics of portfolio returns in a Panel
+    Args:
+        panel_id (str): The id of the panel data set to evaluate.
+    Returns:
+        str: Performance evaluation metrics in JSON format.
+    """
+    log_message(tool="Panel_performance_metrics", code=f"{panel_id=}")
+    p1 = panel_or_numeric(panel_id, **DATES)
+    summary_dict = portfolio_metrics(p1)
+    payload = dict(summary_dict=summary_dict)
+    log_message(str(payload), "Panel_performance_metrics", f"{panel_id=}")
+    return json.dumps(payload)
+
+@mcp.tool()
+def Panel_portfolio_turnover(weights_panel_id: str) -> str:
+    """Compute turnover for a portfolio weights panel using drifted imputation.
+
+    Args:
+        weights_panel_id (str): Identifier of the panel containing portfolio weights.
+
+    Returns:
+        str: JSON string containing the persisted panel identifier of the computed turnover output.
+    """
+    log_message(tool="Panel_portfolio_turnover", code=f"{weights_panel_id=}")
+    weights = panel_or_numeric(weights_panel_id, **DATES)
+    drifted = portfolio_impute(weights, drifted=True)
+    delta = weights - drifted
+    turnover = delta.apply(np.abs).apply(np.sum, axis=0).apply(np.mean).persist()
+    log_message(turnover.to_json(), "Panel_portfolio_turnover", f"{weights_panel_id=}")
+    return turnover.to_json()
 
 
 
@@ -433,10 +501,16 @@ class PortfolioEvaluation:
         return self.portfolio.apply(ic_func, ret, fillna=0)
 '''
 
-TODO:
-- def TimeFrame.performance(): annualized return, volatility, sharpe ratio, max drawdown
-- def Panel.turnover()
-- Download and check JKP factors
+    def astype(self, dtype) -> "Panel":
+        """Change the dtype of the values of this Panel."""
+        if isinstance(self._frame, pd.DataFrame):
+            self._frame = self._frame.astype(dtype)
+        return self
+
+# TODO:
+# - def TimeFrame.performance(): annualized return, volatility, sharpe ratio, max drawdown
+# - def Panel.turnover()
+# - Download and check JKP factors
 """
 
 import matplotlib.pyplot as plt

@@ -1,0 +1,8 @@
+if __name__ == "__main__":
+
+    if False: # True:  # Test RAG
+        char_rag = RAG(CHARACTERISTICS_RAG, out_dir=RAG_PATH).load()
+        bench_rag = RAG(BENCHMARKS_RAG, out_dir=RAG_PATH).load()
+        print(json.dumps(query_rag("quarterly total assets", rag=char_rag), indent=2))
+        print(json.dumps(query_rag('HML', rag=bench_rag), indent=2))
+        print(json.dumps(query_rag('12 month price momentum', rag=char_rag), indent=2))

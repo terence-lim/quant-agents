@@ -1,0 +1,83 @@
+"""
+Define price momentum characteristic as past 12 months' stock returns skipping one month.
+
+Define volatility as the average of squared monthly stock returns over the past 12 months.
+"""
+import pandas as pd
+import numpy as np
+import time
+from qrafti import write_report, markdown_to_pdf
+
+# Let Coding Agent tackle these, with few-shot example from rolling()
+
+def ewm(df: pd.DataFrame, agg: str = "mean", alpha: float = 1 - 0.94, min_periods: int = 0, **kwargs) -> "Panel":
+    """Compute an exponentially weighted moving function of this Panel.
+    Arguments:
+        agg: Aggregation function to apply 'mean' (default), 'sum', 'min', 'max'.
+        alpha: Smoothing factor for the EWM, 0 < alpha <= 1
+        min_periods: Minimum observations in window required to have a value (if None, then set to half-life)
+
+        **kwargs: additional arguments to pass to pd.DataFrame.ewm.
+    Usage:
+        panel.trend(ewm, agg="mean", alpha=1.0.94, interval=1)
+    """
+    if min_periods is None:
+        min_periods = int(np.ceil(-np.log(2) / np.log(1 - alpha)))  # half-life implied by alpha
+    return df.ewm(alpha=alpha, min_periods=min_periods, **kwargs).agg(agg).where(df.notna())
+
+def expanding(df: pd.DataFrame, agg: str = "mean", **kwargs) -> "Panel":
+    """Compute an expanding window function of this Panel.
+    Arguments:
+        agg: Aggregation function to apply 'mean' (default), 'sum', 'min', 'max'.
+        **kwargs: additional arguments to pass to pd.DataFrame.expanding.
+    Usage:
+        panel.trend(expanding, agg="mean", interval="1")
+    """
+    return df.expanding(**kwargs).agg(agg).where(df.notna())
+
+
+if __name__ == '__main__':
+    tic = time.time()
+    
+    from qrafti import Panel, regression_residuals
+    
+    if True :
+        panel = Panel().load('EXCRET')
+        #reference = [Panel().load('Mkt-RF'), Panel().load('HML'), Panel().load('SMB')]
+        reference = Panel().load('Mkt-RF')
+        out = panel.trend(regression_residuals, reference)
+        print('Elapsed', int(time.time() - tic), 'secs')
+    if False:
+        tic = time.time()
+        window, skip = 12, 1
+        ret = Panel().load('RET').log1p()
+        signal = ret.pow(2).trend(ewm, min_periods=None).pow(0.5)
+        print('Elapsed', int(time.time() - tic), 'secs')
+        description = "Exponentially-weighted returns volatility"
+        context = "\n\n".join([description + "\n------------", write_report(signal)])
+        print('Elapsed', int(time.time() - tic), 'secs')
+        with open("output.md", "w") as f:
+            f.write(context)
+        markdown_to_pdf(context)
+    
+    if False: # True: # rolling regression check 11379 (10 mins for full panel)
+        panel = Panel().load('RET') - Panel().load('RF')
+        reference = Panel().load('Mkt-RF')
+        coeff = 1
+        out = panel.trend(rolling_regression, reference, window=12, coeff=coeff, interval=1)
+
+        z = panel[11379].to_frame().join(reference.frame, how='inner', rsuffix='_ref')
+        y = rolling_regression(z, window=12, coeff=coeff)
+
+        out[11379]
+    if False: # True:  # Calculate Momentum and EWMA volatility: check 11379
+        window, skip = 12, 1
+        jkp = Panel().load(f'ret_{window}_{skip}')
+        ret = Panel().load('RET').log1p()
+        mom = ret.trend(rolling, window=window, skip=skip, agg="sum", interval=1).expm1()
+        corr = mom.apply(lambda x: x.iloc[:, 0].corr(x.iloc[:, 1], method='pearson'), reference=jkp)
+        count = mom.apply(len, reference=jkp, how='inner')
+        vol = ret.pow(2).trend(ewm).pow(0.5)
+        jkp['2020-12-31':]
+
+    

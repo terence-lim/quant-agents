@@ -1,0 +1,251 @@
+# streamlit run st_client.py --server.fileWatcherType="poll"
+import os
+import streamlit as st
+import asyncio
+import glob
+from datetime import datetime
+from pathlib import Path
+from dotenv import load_dotenv
+from pydantic_ai import Agent, RunContext
+from pydantic_ai.exceptions import UnexpectedModelBehavior
+from pydantic_ai.mcp import MCPServerStreamableHTTP
+import logfire
+from pydantic_ai.models.openai import OpenAIChatModel, OpenAIResponsesModel, OpenAIResponsesModelSettings
+from pydantic_ai.providers.openai import OpenAIProvider
+from pydantic_ai.models.google import GoogleModel, GoogleModelSettings
+import logging
+from show_logs import load_objects, generate_dot
+from qrafti import restart
+
+logging.basicConfig(level=logging.DEBUG)
+
+# Load env vars
+load_dotenv()
+
+# Configure logging
+#logfire.configure()
+#logfire.instrument_pydantic_ai()
+
+# --- Helper Functions ---
+
+def log_conversation(debug_text: str = ''):
+    with (open("debug_query.txt", 'w') as f):
+        f.write(f"=== {str(datetime.now())} ===\n")
+        f.write(debug_text)
+        f.flush()
+
+def build_conversation_context() -> str:
+    conversation_text = "\n".join(
+        [f"{m['role']}: {m['content']}" for m in st.session_state.messages]
+    )
+    return conversation_text
+
+# --- Model Configuration ---
+model_parameters = {}
+model = GoogleModel('gemini-3-pro-preview')
+model_parameters = GoogleModelSettings(google_thinking_config={'include_thoughts': False})
+
+# --- Agents, Tools and MCP ---
+factor_server = MCPServerStreamableHTTP(url="http://localhost:8000/mcp")
+report_server = MCPServerStreamableHTTP(url="http://localhost:8001/mcp")
+
+research_agent = Agent(
+    name="Factor Research Agent",
+    model=model,
+    model_settings={'temperature': 0.0, **model_parameters},
+    system_prompt="""You are a Factor Research Agent...""", # (Prompt truncated for brevity, same as original)
+    toolsets=[factor_server]
+)
+
+report_agent = Agent(
+    name="Report Writing Agent",
+    model=model, 
+    model_settings={'temperature': 0.0, **model_parameters},
+    system_prompt="""Use the tools to write a research memo...""", # (Prompt truncated for brevity)
+    toolsets=[report_server],
+)
+
+async def run_agent_safely(agent, query: str, role_label: str, retries: int = 1) -> str:
+    attempt = 0
+    while True:
+        try:
+            response = await agent.run(query)
+            return response.output if hasattr(response, "output") else str(response)
+        except UnexpectedModelBehavior as e:
+            attempt += 1
+            if attempt > retries:
+                return f"{role_label} could not complete the step due to model error."
+            await asyncio.sleep(0.4)
+        except Exception as e:
+            return f"{role_label} failed with an unexpected error: {e}"
+
+@research_agent.tool
+async def report_agent_tool(ctx: RunContext, query: str) -> str:
+    full_query = build_conversation_context()
+    log_conversation(full_query)
+    out = await run_agent_safely(report_agent, full_query, "Report Agent", retries=1)
+    st.session_state.messages.append({"role": "Report Agent", "content": f"{out}"})
+    return out
+
+# --- UI Setup ---
+st.set_page_config(layout="wide", page_title="Quant Research Agents")
+
+# CSS Styling (Same as original)
+#    html, body, [class*="block-container"] { font-size: 14px !important; line-height: 1.0 !important; }
+#    h1, h2, h3 { font-size: 20px !important; }
+
+# --- UI Setup ---
+st.set_page_config(layout="wide", page_title="Quant Research Agents")
+
+# CSS Styling for Sticky Tabs and Large Font
+st.markdown("""
+    <style>
+/* --- Sticky tab header row --- */
+div[data-testid="stTabs"] [data-baseweb="tab-list"]{
+  position: sticky;
+  top: 0;                 /* stick to top of the page content area */
+  z-index: 1000;          /* stay above scrolling content */
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+
+/* Optional: give a little breathing room so content doesn't feel "under" the tabs */
+div[data-testid="stTabs"] [data-baseweb="tab-panel"]{
+  padding-top: 0.5rem;
+}
+
+    /* 2. Set Font Size to 20px for Agent Chat & Input */
+    /* Targets the container and specific markdown elements within chat */
+    div[data-testid="stChatMessage"] p, 
+    div[data-testid="stChatMessage"] {
+        font-size: 20px !important;
+        line-height: 1.4 !important;
+    }
+    
+    /* Ensure the chat input also reflects the larger size */
+    div[data-testid="stChatInput"] textarea {
+        font-size: 20px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# --- Tabs Implementation ---
+tab_chat, tab_plots, tab_graph = st.tabs(["Agent Chat", "Output Plots", "Computation Graph"])
+
+# --- TAB 1: AGENT CHAT ---
+with tab_chat:
+    st.title("Quant Research Agents")
+    
+    # Sidebar for Chat Controls
+    with st.sidebar:
+        st.header("Chat Controls")
+        if st.session_state.messages:
+            if st.button("Undo Last Query", width='content'):
+                last_user_index = -1
+                for i in range(len(st.session_state.messages) - 1, -1, -1):
+                    if st.session_state.messages[i]["role"] == "user":
+                        last_user_index = i
+                        break
+                if last_user_index != -1:
+                    st.session_state.messages = st.session_state.messages[:last_user_index]
+                    st.rerun()
+
+            if st.button("Clear All History", width='content'):
+                st.session_state.messages = []
+                st.rerun()
+        else:
+            st.write("No history to manage.")
+
+        st.header("Cache Manager")
+        cache_btn = st.button("Reset Cache")
+
+    if cache_btn:
+        restart()
+        st.info("Data Cache has been reset")
+
+    # Display Chat
+    for msg in st.session_state.messages:
+        role = "You" if msg["role"] == "user" else f"{msg['role']}"
+        with st.chat_message(msg["role"]):
+            st.markdown(f"**{role}:** {msg['content']}")
+
+    if prompt := st.chat_input("Type your message..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(f"You: {prompt}")
+
+        full_query = build_conversation_context()
+        try:
+            response = research_agent.run_sync(full_query)
+            res_content = str(response.output)
+        except Exception as e:
+            res_content = f"Research Agent error: {e}"
+
+        st.session_state.messages.append({"role": "Research Agent", "content": res_content})
+
+        debug_text = build_conversation_context()
+        log_conversation(debug_text)
+
+        st.rerun()
+
+# --- TAB 2: OUTPUT PLOTS ---
+with tab_plots:
+    st.title("Output Plots")
+    media_path = "/home/terence/Downloads/scratch/2024/JKP/media"
+    
+    # Logic to get the 5 most recent PNGs
+    list_of_files = glob.glob(os.path.join(media_path, "*.png"))
+    sorted_files = sorted(list_of_files, key=os.path.getmtime, reverse=True)[:5]
+    file_map = {os.path.basename(f): f for f in sorted_files}
+
+    with st.sidebar:
+        st.header("Plot Selector")
+        if file_map:
+            # Implemented as a Dropdown Menu
+            selected_name = st.selectbox("Select a plot to view:", list(file_map.keys()), index=0)
+            selected_path = file_map[selected_name]
+        else:
+            st.warning("No .png files found.")
+            selected_path = None
+
+    if selected_path:
+        st.subheader(f"Current Plot: {os.path.basename(selected_path)}")
+        st.image(selected_path, width='content')
+
+# --- TAB 3: COMPUTATION GRAPH ---
+with tab_graph:
+    st.title("Computation Graph")
+    
+    with st.sidebar:
+        st.header("Graph")
+        try:
+            objects = load_objects()
+            st.success(f"Loaded {len(objects)} valid objects")
+            
+            start_key = st.text_input(
+                "Root Panel ID:", 
+                placeholder="_panel_id_...",
+                help="Enter the root panel_id (with leading underscore)"
+            )
+            
+            generate_btn = st.button("Generate Graph")
+        except Exception as e:
+            st.error(f"Error loading objects: {e}")
+            generate_btn = False
+
+    if generate_btn and start_key:
+        try:
+            with st.spinner("Generating subgraph..."):
+                generate_dot(objects, start_key)
+            
+            if os.path.exists("subgraph.png"):
+                st.image("subgraph.png", caption=f"Dependency graph for {start_key}", width='content')
+            else:
+                st.error("subgraph.png was not generated. Check if graphviz is installed.")
+        except Exception as e:
+            st.error(f"Failed to generate graph: {e}")
+    elif not start_key:
+        st.info("Please enter a root panel_id in the sidebar to visualize the graph.")
