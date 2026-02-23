@@ -1,6 +1,6 @@
 # start.py  (c) Terence Lim 2025
 
-from utils import as_nptype, STOCK_NAME, DATE_NAME, BENCHMARKS_RAG, CHARACTERISTICS_RAG
+from utils import as_nptype, STOCK_NAME, DATE_NAME, BENCHMARKS_RAG, CHARACTERISTICS_RAG, JKP_RAG_PATH, CRSP_RAG_PATH
 from qrafti import Panel
 from rag import RAG
 
@@ -17,16 +17,9 @@ from pprint import pprint, pformat
 import logging
 
 logging.basicConfig(level=logging.DEBUG)  # 10 Detailed info for debugging
-# logging.basicConfig(level=logging.INFO)     # 20 General runtime events
-# logging.basicConfig(level=logging.WARNING)  # 30 Something unexpected but not fatal
-# logging.basicConfig(level=logging.ERROR)    # 40 A problem that prevented something
-# logging.basicConfig(level=logging.CRITICAL) # 50 Serious failure
-# logging.disable(logging.CRITICAL)
+# logging.disable(logging.CRITICAL)  # DEBUG, INFO, WARNING, ERROR, CRITICAL
 
-#
-# Leave these 
-#
-
+# RAW DATA PATHS
 CRSP_DATA = Path("/home/terence/Downloads/scratch/2024/CRSP")
 PSTAT_DATA = Path("/home/terence/Downloads/scratch/2024/PSTAT")
 DATA_LAKE = Path("/home/terence/Downloads/scratch/2024/JKP")
@@ -615,21 +608,22 @@ if __name__ == "__main__":
     #
     ###########################
 
-    # filename = 'F-F_Research_Data_Factors.csv'
-    # keep = {'Mkt-RF': "Monthly excess return on the market",
-    #         'HML': "Fama-French HML factor constructed as the average return on two value portfolios minus the average return on two growth portfolios",
-    #         'SMB': "Fama-French SMB factor constructed as the average return on three small portfolios minus the average return on three big portfolios",
-    #         'RF': "Risk-free return as the one-month Treasury bill rate"}
-    # df = load_fama_french(BENCHMARKS_DIR / filename, sep=',', mul=0.01, keep=keep.keys())
-    # RAG(BENCHMARKS_RAG, out_dir=CRSP_RAG_PATH).build(pd.Series(keep))
-    # RAG(BENCHMARKS_RAG, out_dir=JKP_RAG_PATH).build(pd.Series(keep))
+    if True:
+        filename = 'F-F_Research_Data_Factors.csv'
+        keep = {'Mkt-RF': "Monthly excess return on the market",
+                'HML': "Fama-French HML factor constructed as the average return on two value portfolios minus the average return on two growth portfolios",
+                'SMB': "Fama-French SMB factor constructed as the average return on three small portfolios minus the average return on three big portfolios",
+                'RF': "Risk-free return as the one-month Treasury bill rate"}
+        df = load_fama_french(BENCHMARKS_DIR / filename, sep=',', mul=0.01, keep=keep.keys())
+        RAG(BENCHMARKS_RAG, out_dir=CRSP_RAG_PATH).build(pd.Series(keep))
+        RAG(BENCHMARKS_RAG, out_dir=JKP_RAG_PATH).build(pd.Series(keep))
 
-    # filename = 'F-F_Research_Data_5_Factors_2x3.csv'
-    # keep = {'RMW': "Fama-French RMW factor constructed as the average return on two robust profitability portfolios minus the average return on two weak profitability portfolios",
-    #         'CMA': "Fama-French CMA factor constructed as the average return on two conservative investment portfolios minus the average return on two aggressive investment portfolios"}
-    # df = load_fama_french(BENCHMARKS_DIR / filename, sep=',', mul=0.01, keep=keep.keys())
-    # RAG(BENCHMARKS_RAG, out_dir=CRSP_RAG_PATH).load().add_documents(pd.Series(keep), overwrite=False)
-    # RAG(BENCHMARKS_RAG, out_dir=JKP_RAG_PATH).load().add_documents(pd.Series(keep), overwrite=False)
+        filename = 'F-F_Research_Data_5_Factors_2x3.csv'
+        keep = {'RMW': "Fama-French RMW factor constructed as the average return on two robust profitability portfolios minus the average return on two weak profitability portfolios",
+                'CMA': "Fama-French CMA factor constructed as the average return on two conservative investment portfolios minus the average return on two aggressive investment portfolios"}
+        df = load_fama_french(BENCHMARKS_DIR / filename, sep=',', mul=0.01, keep=keep.keys())
+        RAG(BENCHMARKS_RAG, out_dir=CRSP_RAG_PATH).load().add_documents(pd.Series(keep), overwrite=False)
+        RAG(BENCHMARKS_RAG, out_dir=JKP_RAG_PATH).load().add_documents(pd.Series(keep), overwrite=False)
 
     # ###########################
     # #
@@ -637,54 +631,57 @@ if __name__ == "__main__":
     # #
     # ###########################
 
-    # #df_data = load_crsp()
-    # RAG(CHARACTERISTICS_RAG, out_dir=CRSP_RAG_PATH).build(pd.Series(crsp_definitions))
-    # RAG(CHARACTERISTICS_RAG, out_dir=JKP_RAG_PATH).build(pd.Series(crsp_definitions))
+    if True:
+    #df_data = load_crsp()
+        RAG(CHARACTERISTICS_RAG, out_dir=CRSP_RAG_PATH).build(pd.Series(crsp_definitions))
+        RAG(CHARACTERISTICS_RAG, out_dir=JKP_RAG_PATH).build(pd.Series(crsp_definitions))
 
-    # # Compute stock excess returns EXCRET = RET - RF
-    # ret = Panel().load("RET", start_date="1900-01-01", end_date="2100-12-31")
-    # rf = Panel().load("RF", start_date="1900-01-01", end_date="2100-12-31")
-    # excret = ret.where(subset=rf) - rf
-    # excret.save("EXCRET")
+        # Compute stock excess returns EXCRET = RET - RF
+        ret = Panel().load("RET", start_date="1900-01-01", end_date="2100-12-31")
+        rf = Panel().load("RF", start_date="1900-01-01", end_date="2100-12-31")
+        excret = ret.where(subset=rf) - rf
+        excret.save("EXCRET")
 
     ###########################
     #
     # Load PSTAT Annual and Quarterly characteristics
     #
     ###########################
-    # pstat = load_pstat(source="Annual", subnames=["2020", "2010", "2000", "1990", "1980", "1950"])
-    # pstat = load_pstat(source="Quarterly", subnames=["2010", "2000", "1990", "1960"])
-    pstat = load_pstat(source="Quarterly", subnames=["1990"])
+    if True:
+        # pstat = load_pstat(source="Annual", subnames=["2020", "2010", "2000", "1990", "1980", "1950"])
+        # pstat = load_pstat(source="Quarterly", subnames=["2010", "2000", "1990", "1960"])
+        pstat = load_pstat(source="Quarterly", subnames=["1990"])
 
-    # Number of years and quarters that characteristic has been observed for each stock
-    years = (
-        Panel()
-        .load("at", start_date="1900-01-01", end_date="2100-12-31")
-        .trend(cumcount, resample=False)
-    )
-    years.save("YEARS")
-    quarters = (
-        Panel()
-        .load("atq", start_date="1900-01-01", end_date="2100-12-31")
-        .trend(cumcount, resample=False)
-    )
-    quarters.save("QUARTERS")
-
-    df = pd.Series(
-        dict(
-            YEARS="Number of previous years that the stock has existed in Compustat Annual",
-            QUARTERS="Number of previous quarters that the stock has existed in Compustat Quarterly",
+        # Number of years and quarters that characteristic has been observed for each stock
+        years = (
+            Panel()
+            .load("at", start_date="1900-01-01", end_date="2100-12-31")
+            .trend(cumcount, resample=False)
         )
-    )
-    RAG(CHARACTERISTICS_RAG, out_dir=CRSP_RAG_PATH).load().add_documents(
-        df, overwrite=True
-    )
+        years.save("YEARS")
+        quarters = (
+            Panel()
+            .load("atq", start_date="1900-01-01", end_date="2100-12-31")
+            .trend(cumcount, resample=False)
+        )
+        quarters.save("QUARTERS")
+
+        df = pd.Series(
+            dict(
+                YEARS="Number of previous years that the stock has existed in Compustat Annual",
+                QUARTERS="Number of previous quarters that the stock has existed in Compustat Quarterly",
+            )
+        )
+        RAG(CHARACTERISTICS_RAG, out_dir=CRSP_RAG_PATH).load().add_documents(
+            df, overwrite=True
+        )
 
     ###########################
     #
     # Load JKP benchmarks and characteristics
     #
     ###########################
-#    jkp = load_jkp(build_characteristics=False)
+    if True:
+        jkp = load_jkp(build_characteristics=False)
 
 #    raise Exception

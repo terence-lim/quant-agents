@@ -1,14 +1,11 @@
 # qrafti.py  (c) Terence Lim
 
-from utils import DataCache, markdown_to_pdf, Calendar, MEDIA, STOCK_NAME, DATE_NAME
+from utils import DataCache, Calendar, MEDIA, STOCK_NAME, DATE_NAME
 from portfolio import PortfolioEvaluation
-from rag import RAG
 
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 from pathlib import Path
-import re
 from tqdm import tqdm
 import json
 from typing import List, Dict, Union, Set, Any, Tuple, Callable
@@ -16,24 +13,19 @@ from datetime import datetime
 import time
 import pandas as pd
 from pandas.api.types import is_list_like, is_scalar, is_numeric_dtype, is_float_dtype
-import matplotlib.pyplot as plt
-import os
 import logging
 import warnings
 warnings.simplefilter(action="ignore", category=FutureWarning)
 logging.disable(logging.DEBUG)
 #pd.set_option("future.no_silent_downcasting", True)  # for fillna behavior
 
-
 #
 # These are temporarily here, should be in utils.py...
 #
 DATES = dict(start_date="2020-01-01", end_date="2024-12-31")
 #DATES = dict(start_date="2001-01-01", end_date="2024-12-31")
-#DATES = dict(start_date="1960-01-01", end_date="2024-12-31")
 
 CRSP_VERSION = True
-
 if CRSP_VERSION:
     RAG_PATH = Path("/home/terence/Downloads/scratch/2024/JKP/CRSP_RAG")
 else:
@@ -42,7 +34,7 @@ else:
 
 ###########################
 #
-# Data Structures to support tools for Research Agents
+# Panel Data Structure and Operations
 #
 ###########################
 
@@ -138,12 +130,6 @@ class Panel:
         Returns:
             The value(s) at the specified index, or None if not found
         """
-        # Handle string range: obj['a':'c']
-        # if isinstance(key, slice):
-        #     start, stop = key.start, key.stop
-        #     keys = [k for k in self.data if (start is None or k >= start)
-        #                                    and (stop  is None or k <= stop)]
-        #    return {k: self.data[k] for k in keys}
         try:        
             if isinstance(key, slice):
                 start, stop = key.start, key.stop
@@ -1365,8 +1351,6 @@ if __name__ == "__main__":
     dates = DATES
     print(json.dumps(dates, indent=4))
 
-    #from server_utils import str_or_None, panel_or_numeric
- 
     toc = time.time()
     print(f"Total elapsed time: {toc - tic:.2f} seconds")
     print(str(datetime.now()))

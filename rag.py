@@ -6,12 +6,8 @@ import chromadb
 from sentence_transformers import SentenceTransformer
 from pathlib import Path
 import logging
-# logging.basicConfig(level=logging.DEBUG)    # 10 Detailed info for debugging
-# logging.basicConfig(level=logging.INFO)     # 20 General runtime events
-logging.basicConfig(level=logging.WARNING)  # 30 Something unexpected but not fatal
-# logging.basicConfig(level=logging.ERROR)    # 40 A problem that prevented something
-# logging.basicConfig(level=logging.CRITICAL) # 50 Serious failure
-# logging.disable(logging.CRITICAL)
+logging.basicConfig(level=logging.WARNING)
+# logging.disable(logging.CRITICAL) # DEBUG, INFO, WARNING, ERROR, CRITICAL
 
 
 class RAG:
@@ -326,7 +322,7 @@ class RAG:
 # EXAMPLE USAGE
 # ============================================================
 if __name__ == "__main__":
-    from utils import BENCHMARKS_RAG, CHARACTERISTICS_RAG, JKP_RAG_PATH
+    from utils import BENCHMARKS_RAG, CHARACTERISTICS_RAG, JKP_RAG_PATH, CRSP_RAG_PATH
     RAG_PATH = CRSP_RAG_PATH   # JKP_RAG_PATH
 
     rag = RAG(CHARACTERISTICS_RAG, RAG_PATH).load()
