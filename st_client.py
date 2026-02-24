@@ -166,10 +166,14 @@ If a tool call returned an unexpected error, try calling once more with the same
     1. panel_id: The identifier of the panel (e.g. _12345).
     2. description: A clear and detailed description of the factor/characteristic being analyzed (e.g. 'Earnings Yield').
 * Look through the conversation history or previous tool outputs to find the correct panel ID and description.
-* Use coding_agent_tool when the user asks to run Python code, to compute values via direct code execution,
-  or to validate a calculation with executable Python.
-* For coding_agent_tool, pass one argument named `code_str` containing valid Python code.
-  Ensure the code is complete and runnable as-is.
+* Prefer existing research tools first (lookup/build/manipulate/analyze tools already available to you).
+  Use coding_agent_tool only when:
+    - the user explicitly asks for Python execution, OR
+    - existing tools cannot accomplish the required panel manipulation/analysis.
+* coding_agent_tool supports two modes:
+    1) Run given code: provide `code_str` with complete runnable Python.
+    2) Write-then-run code: provide `task_description` (and optionally `code_str` as a starter template).
+* For write-then-run requests, clearly specify panel IDs, expected transformation, and output expectations.
 
 # Guidelines:
 * Do not use or assume any data or panels that you were not given or 
@@ -206,22 +210,115 @@ coding_agent = Agent(
 You are the Python Coding Agent.
 
 Purpose:
-* Execute user-requested Python snippets via the execute_python tool.
-* Return precise, faithful execution results to the caller agent.
+* Either (A) run provided Python code, or (B) write new Python code then run it via execute_python.
+* Support Panel-data workflows in qrafti using standard Python libraries when needed.
 
-Operational rules:
-1. Always run code via execute_python; do not simulate execution.
-2. The authoritative code to run is provided in the COMMAND line included in the query as:
-   COMMAND: Execute Python code: <code>
-3. Extract the exact code payload and call execute_python(code_str=<extracted_code>) once.
-4. If the tool returns structured error JSON (e.g., exit_code/error_message), return that clearly.
-5. Do not add extra assumptions or hidden preprocessing to the code unless explicitly requested.
-6. Keep the response concise and include the raw output (or explicit error details) so the research agent
-   can incorporate it into its reasoning.
+Decision policy:
+1. Parse COMMAND in the query.
+2. If COMMAND says "Execute Python code", run the provided code exactly.
+3. If COMMAND says "Write and execute Python code", synthesize code that satisfies the requested task,
+   then run that synthesized code.
+4. Always execute through execute_python; never simulate execution.
 
-Formatting guidance:
-* Prefer plain text.
-* If output appears JSON, preserve it without modification.
+Panel coding conventions for synthesized code:
+* Prefer `from qrafti import Panel, DATES, plt_savefig` when relevant.
+* Load existing panels with `Panel().load(panel_id, **DATES)`.
+* Use Panel methods (`apply`, `trend`, `restrict`, operators) for panel operations; use `.frame` for pandas/lib usage.
+* If plotting, use `plt_savefig()` to save the figure and include the image filename in output JSON.
+* At the end of data-panel scripts, always persist with `.save()` and print `as_payload()` in JSON form.
+
+Minimal Panel cheatsheet:
+* Initialize: `Panel()`, `Panel(scalar)`, `Panel(df)`, `Panel(series)`, `Panel(other_panel)`.
+* Cross-section by date: `panel.apply(helper, reference=None, how="left", fill_value=0)`.
+* Time-series by stock: `panel.trend(helper, reference=None|list[Panel], how="left", fill_value=0)`.
+* Useful APIs: `copy`, `ones_like`, `shift`, `restrict`, `.frame`, `save`, `as_payload`.
+* Operators: arithmetic/comparison/logical (`+ - * / **`, `== != < <= > >=`, `& |`), unary (`-`, `~`, `abs`, `log1p`, `exp`, `expm1`), and `@` (date-wise dot product).
+
+Four reference examples to adapt when synthesizing code:
+1) `.frame` + matplotlib plotting
+```python
+from qrafti import Panel, DATES, plt_savefig
+import matplotlib.pyplot as plt
+import json
+
+panel_id = "HML"
+returns_panel = Panel().load(panel_id, **DATES)
+returns_df = returns_panel.frame
+
+plt.plot(returns_df.index, returns_df.cumsum().values)
+plt.title(panel_id)
+plt.xlabel("Date")
+plt.ylabel("Return")
+plt.tight_layout()
+
+result_panel = returns_panel.save()
+out_dict = {**result_panel.as_payload(), "image file name": plt_savefig()}
+print(json.dumps(out_dict))
+```
+
+2) Cross-sectional `apply()` winsorization by date
+```python
+from qrafti import Panel, DATES
+import pandas as pd
+import json
+
+def winsorize_helper(x, lower=0.05, upper=0.95):
+    if x.shape[1] > 1:
+        lo, hi = x.loc[x.iloc[:, -1].astype(bool)].iloc[:, 0].quantile([lower, upper]).values
+    else:
+        lo, hi = x.iloc[:, 0].quantile([lower, upper]).values
+    return x.iloc[:, 0].clip(lower=lo, upper=hi)
+
+data_panel = Panel().load("RET", **DATES)
+indicator_panel = (Panel().load("EXCHCD", **DATES) == 1)
+result_panel = data_panel.apply(winsorize_helper, indicator_panel, how="left", fill_value=0).save()
+print(json.dumps(result_panel.as_payload()))
+```
+
+3) Time-series `trend()` residual regression by stock
+```python
+from qrafti import Panel, DATES
+import pandas as pd
+import numpy as np
+import json
+
+def residuals_helper(x: pd.DataFrame) -> pd.Series:
+    y = x.iloc[:, 0].values
+    X = np.column_stack([np.ones(len(x)), x.iloc[:, 1:].values])
+    if not (np.isfinite(X).all() and np.isfinite(y).all()):
+        return pd.Series([np.nan] * len(x), index=x.index)
+    try:
+        b, *_ = np.linalg.lstsq(X, y, rcond=None)
+    except np.linalg.LinAlgError:
+        b = np.linalg.pinv(X) @ y
+    return pd.Series(y - X @ b, index=x.index)
+
+ret = Panel().load("RET", **DATES)
+factors = [Panel().load(pid, **DATES) for pid in ["Mkt-RF", "SMB", "HML"]]
+result_panel = ret.trend(residuals_helper, factors).save()
+print(json.dumps(result_panel.as_payload()))
+```
+
+4) Time-series rolling metric with `trend()`
+```python
+from qrafti import Panel, DATES
+import pandas as pd
+import json
+
+def rolling_helper(df: pd.DataFrame) -> pd.Series:
+    window, skip = 12, 1
+    return df.shift(periods=skip).rolling(window=window - skip).sum().where(df.notna())
+
+log_returns = Panel().load("RET", **DATES).log1p()
+result_panel = log_returns.trend(rolling_helper).save()
+print(json.dumps(result_panel.as_payload()))
+```
+
+Output rules:
+* Return concise results including:
+  - executed code (when synthesized), and
+  - raw stdout / structured error from execute_python.
+* Preserve JSON outputs exactly when present.
 """,
     toolsets=[coding_server],
 )
@@ -261,14 +358,23 @@ async def report_agent_tool(ctx: RunContext, panel_id: str, description: str) ->
     return out
 
 @research_agent.tool
-async def coding_agent_tool(ctx: RunContext, code_str: str) -> str:
+async def coding_agent_tool(ctx: RunContext, code_str: str = "", task_description: str = "") -> str:
     """
-    Delegate Python code execution to the Coding Agent.
+    Delegate Python work to the Coding Agent.
 
     Args:
-        code_str: A complete Python code snippet to execute.
+        code_str: Optional complete Python snippet to run directly.
+        task_description: Optional description for writing-then-running new Python code.
     """
-    instruction = f"COMMAND: Execute Python code:\n{code_str}"
+    if code_str.strip() and not task_description.strip():
+        instruction = f"COMMAND: Execute Python code:\n{code_str}"
+    else:
+        instruction = (
+            "COMMAND: Write and execute Python code for this task:\n"
+            f"{task_description.strip()}\n\n"
+            "Starter code (optional):\n"
+            f"{code_str.strip()}"
+        )
     st.session_state.messages.append({"role": "Research Agent", "content": instruction})
 
     full_query = build_conversation_context()
