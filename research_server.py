@@ -1,4 +1,4 @@
-# python server.py
+# python research_server.py
 from mcp.server.fastmcp import FastMCP
 import json
 import pandas as pd
@@ -11,15 +11,15 @@ import traceback
 import warnings
 import logging
 
-from utils import MEDIA, BENCHMARKS_RAG, CHARACTERISTICS_RAG
-from qrafti import Panel, winsorize, digitize, characteristics_coalesce, characteristics_resample
-from qrafti import portfolio_weights, portfolio_returns, rolling, regression_residuals
-from server_utils import panel_or_numeric, str_or_None, bool_or_None, int_or_None, log_tool
-from server_utils import query_rag
+from utils import BENCHMARKS_RAG, CHARACTERISTICS_RAG
+from research_utils import (winsorize, digitize, characteristics_coalesce, characteristics_resample,
+                            portfolio_weights, portfolio_returns, rolling, regression_residuals)
+from server_utils import panel_or_numeric, str_or_None, bool_or_None, int_or_None, log_tool, query_rag
 from rag import RAG
+from qrafti import Panel, plt_savefig, DATES
 
 # Temporarily in qrafti
-from qrafti import RAG_PATH, DATES
+from qrafti import RAG_PATH
 
 logging.basicConfig(level=logging.DEBUG)
 warnings.simplefilter(action="ignore", category=FutureWarning)
@@ -30,7 +30,7 @@ bench_rag = RAG(BENCHMARKS_RAG, out_dir=RAG_PATH).load()
 
 # Create an MCP server
 port = 8000
-mcp = FastMCP("factor-server", host="0.0.0.0", port=port)
+mcp = FastMCP("research-server", host="0.0.0.0", port=port)
 
 @mcp.tool()
 def Panel_binary_op(
@@ -703,9 +703,8 @@ def Panel_plot(panel_id: str, other_panel_id: str = '', kind: str ='line', title
             ax = p1.plot(p2, kind=kind, title=title)
         else:
             ax = p1.plot(kind=kind, title=title)
-        savefig = MEDIA / f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}.png'
-        plt.savefig(savefig)
-        out = dict(image_path_name='file:///' + str(savefig))
+        savefig = plt_savefig()
+        out = dict(image_path_name=str(savefig))
     except Exception as e:
         out = dict(error=traceback.format_exc())
     log_tool(tool="Panel_plot", 

@@ -11,9 +11,8 @@ Define volatility as the average of squared monthly stock returns over the past 
 import pandas as pd
 import numpy as np
 import time
-from qrafti import write_report, markdown_to_pdf
-
-from qrafti import DATES, rolling
+from utils import markdown_to_pdf
+from qrafti import DATES, rolling, write_report
 
 if __name__ == '__main__':
     tic = time.time()

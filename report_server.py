@@ -1,9 +1,10 @@
 # python performance_server.py
 from mcp.server.fastmcp import FastMCP
-from utils import MEDIA
+from utils import MEDIA, markdown_to_pdf
 import traceback
 import json
-from qrafti import write_report, markdown_to_pdf, Panel, DATES
+from qrafti import Panel, DATES
+from report_utils import write_report
 from server_utils import panel_or_numeric, str_or_None, bool_or_None, int_or_None, log_tool, now
 import logging
 logging.basicConfig(level=logging.INFO)

@@ -142,8 +142,9 @@ model_parameters = GoogleModelSettings(google_thinking_config={'include_thoughts
 #model = "gemini-3-flash-preview"
 
 # --- Agents, Tools and MCP ---
-factor_server = MCPServerStreamableHTTP(url="http://localhost:8000/mcp")
+research_server = MCPServerStreamableHTTP(url="http://localhost:8000/mcp")
 report_server = MCPServerStreamableHTTP(url="http://localhost:8001/mcp")
+coding_server = MCPServerStreamableHTTP(url="http://localhost:8003/mcp")
 
 research_agent = Agent(
     name="Factor Research Agent",
@@ -164,7 +165,11 @@ If a tool call returned an unexpected error, try calling once more with the same
 * You MUST provide two arguments to this tool:
     1. panel_id: The identifier of the panel (e.g. _12345).
     2. description: A clear and detailed description of the factor/characteristic being analyzed (e.g. 'Earnings Yield').
-* Look through the conversation history or previous tool outputs to find the correct ID and description.
+* Look through the conversation history or previous tool outputs to find the correct panel ID and description.
+* Use coding_agent_tool when the user asks to run Python code, to compute values via direct code execution,
+  or to validate a calculation with executable Python.
+* For coding_agent_tool, pass one argument named `code_str` containing valid Python code.
+  Ensure the code is complete and runnable as-is.
 
 # Guidelines:
 * Do not use or assume any data or panels that you were not given or 
@@ -173,7 +178,7 @@ If a tool call returned an unexpected error, try calling once more with the same
   and you must include the exact identifiers of any Panels you used or generated in your explanation.
   Do not output as JSON format or python code, instead use bulleted points or narrative format for clarity.
 """,
-    toolsets=[factor_server]
+    toolsets=[research_server]
 )
 
 report_agent = Agent(
@@ -191,6 +196,36 @@ Your authoritative instructions for the current task are provided in the 'COMMAN
 """,
     toolsets=[report_server],
 )
+
+
+coding_agent = Agent(
+    name="Python Coding Agent",
+    model=model,
+    model_settings={'temperature': 0.0, **model_parameters},
+    system_prompt="""
+You are the Python Coding Agent.
+
+Purpose:
+* Execute user-requested Python snippets via the execute_python tool.
+* Return precise, faithful execution results to the caller agent.
+
+Operational rules:
+1. Always run code via execute_python; do not simulate execution.
+2. The authoritative code to run is provided in the COMMAND line included in the query as:
+   COMMAND: Execute Python code: <code>
+3. Extract the exact code payload and call execute_python(code_str=<extracted_code>) once.
+4. If the tool returns structured error JSON (e.g., exit_code/error_message), return that clearly.
+5. Do not add extra assumptions or hidden preprocessing to the code unless explicitly requested.
+6. Keep the response concise and include the raw output (or explicit error details) so the research agent
+   can incorporate it into its reasoning.
+
+Formatting guidance:
+* Prefer plain text.
+* If output appears JSON, preserve it without modification.
+""",
+    toolsets=[coding_server],
+)
+
 
 async def run_agent_safely(agent, query: str, role_label: str, retries: int = 1) -> str:
     attempt = 0
@@ -224,6 +259,24 @@ async def report_agent_tool(ctx: RunContext, panel_id: str, description: str) ->
     out = await run_agent_safely(report_agent, full_query, "Report Agent", retries=1)
     st.session_state.messages.append({"role": "Report Agent", "content": f"{out}"})
     return out
+
+@research_agent.tool
+async def coding_agent_tool(ctx: RunContext, code_str: str) -> str:
+    """
+    Delegate Python code execution to the Coding Agent.
+
+    Args:
+        code_str: A complete Python code snippet to execute.
+    """
+    instruction = f"COMMAND: Execute Python code:\n{code_str}"
+    st.session_state.messages.append({"role": "Research Agent", "content": instruction})
+
+    full_query = build_conversation_context()
+    store_conversation(full_query)
+    out = await run_agent_safely(coding_agent, full_query, "Coding Agent", retries=1)
+    st.session_state.messages.append({"role": "Coding Agent", "content": f"{out}"})
+    return out
+
 
 # --- UI Setup ---
 st.set_page_config(layout="wide", page_title="Quant Research Agents")

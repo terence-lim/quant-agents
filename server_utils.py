@@ -34,8 +34,12 @@ def log_tool(tool: str, input: dict = {}, output: dict = {}, mode: str = "a"):
 def log_code(code_str: str, mode: str = "a"):
     """Server utility to keep log of code str executed"""
     with open(CODES_LOGFILE, mode) as f:
-        f.write("\n\n")
-        f.write(code_str)
+        f.write(f'\n\nCODE EXECUTED at {now()}:\n\n')
+        for line in code_str.split('\n'):
+            line = line.rstrip()
+            if line:
+                f.write(line)
+                f.write('\n')
         f.flush()
 
 

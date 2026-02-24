@@ -1,13 +1,13 @@
-# Quantitative Research Agents with Financial Tools and Intelligence
+# Quantitative Research Assistants with Financial Tools and Intelligence
 
-Python modules for agentically running quantitative research workflows, including data/factor services, user access interface, and empirical analysis tooling.
+Python modules for running *multi-agent* quantitative research workflows, including data/factor services, user access interface, and empirical analysis tooling.
 
 ## Project Structure
 
 ### 1) Research Service Layer
-**Files:** `factor_server.py`, `coding_server.py`, `report_server.py`, `server_utils.py`
+**Files:** `factor_server.py`, `coding_server.py`, `report_server.py`, `server_utils.py`, `research_utils.py`, `report_utils.py`
 
-Provides the service-side components for exposing factor computations, custom tool coding, and report generation capabilities. Shared server helpers and common logic live in `server_utils.py`, while the MCP server entry points are separated by specialization (`factor_server.py`, `coding_server.py` and `report_server.py`).
+Provides the service-side components for exposing factor computations, custom tool coding, and report generation capabilities. Shared server helpers and common logic live in `server_utils.py`, `research_utils.py` and `report_utils.py`, while the MCP server entry points are separated by specialization (`factor_server.py`, `coding_server.py` and `report_server.py`).
 
 ### 2) Client Access Layer
 **Files:** `st_client.py`, `client_utils.py`

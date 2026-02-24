@@ -1,7 +1,7 @@
 # python coding_server.py
 from mcp.server.fastmcp import FastMCP
 import json
-from server_utils import log_message, run_code_in_subprocess, log_code
+from server_utils import run_code_in_subprocess, log_code
 import logging
 logging.basicConfig(level=logging.INFO)
 
@@ -23,8 +23,6 @@ def execute_python(code_str: str) -> str:
     """
     log_code(code_str)
     stdout, stderr, exit_code = run_code_in_subprocess(code_str)
-    # print('Exit code:', exit_code)
-    # print(stderr)
     if exit_code:
         return json.dumps({"exit_code": exit_code, "error_message": stderr.strip()})
     else:
