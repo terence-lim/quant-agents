@@ -1,6 +1,6 @@
 # Quantitative Research Agents with Financial Tools and Intelligence
 
-A lightweight collection of Python modules for running quantitative workflows, including data/factor MCP services, client access interface, and portfolio research tooling.
+Python modules for agentically running quantitative research workflows, including data/factor services, user access interface, and empirical analysis tooling.
 
 ## Project Structure
 
@@ -17,5 +17,5 @@ Contains the client-side interface used to connect to and interact with the serv
 ### 3) Financial Intelligence Toolkit
 **Files:** `qrafti.py`, `utils.py`, `portfolio.py`, `rag.py`, `reboot.py`
 
-Contains core analytical and orchestration modules for portfolio-focused workflows, including shared utilities, retrieval-augmented functionality, and operational/restart helpers.
+Contains core analytical and orchestration modules for portfolio-focused research workflows, including shared utilities, retrieval-augmented functionality, and operational/restart helpers.
 

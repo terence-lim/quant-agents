@@ -11,6 +11,7 @@ from qrafti import Panel
 from rag import RAG
 
 TOOLS_LOGFILE = "tools.log"
+CODES_LOGFILE = "codes.log"
 
 def now():
     return str(datetime.now())[:19]
@@ -29,6 +30,13 @@ def log_tool(tool: str, input: dict = {}, output: dict = {}, mode: str = "a"):
         f.write(message + "\n"*2)
         f.flush()
     print(message)
+
+def log_code(code_str: str, mode: str = "a"):
+    """Server utility to keep log of code str executed"""
+    with open(CODES_LOGFILE, mode) as f:
+        f.write("\n\n")
+        f.write(code_str)
+        f.flush()
 
 
 def invalid_panel(panel: Panel) -> str:
@@ -118,23 +126,6 @@ def int_or_None(x: str) -> Union[float, None]:
     except Exception:
         return None
 
-# def log_message(output: str = '', tool: str = '', code: str = '', mode: str = "a"):
-#     """Log a message to the console and a log file."""
-#     message = ['\n' + ("-"*60)]
-#     if output:
-#         message.append(f"Output: {output}")
-#     if tool:
-#         message.append(f"Tool: {tool}")
-#     if code:
-#         message.append(f"Code:\n{code}")
-#     message = "\n".join(message) + f"\nDate: {str(datetime.now())[:19]}\n" 
-#     with open("mcp_server.log", mode) as f:
-#         f.write(message)
-#         f.flush()
-#     print(message)
-
-# log_message(f"MCP server started on {str(datetime.now())}", mode="w")
-
 
 ###########################
 #
@@ -142,7 +133,7 @@ def int_or_None(x: str) -> Union[float, None]:
 #
 ###########################
 def run_code_in_subprocess(code_str):
-    with open("/home/terence/Dropbox/github/thesis/quant-agents/tmp.log", "w") as f:
+    with open("/home/terence/Dropbox/github/thesis/quant-agents/coding.log", "w") as f:
         f.write(f"RUN CODE IN SUBPROCESS: {code_str}\n")
         f.flush()
 

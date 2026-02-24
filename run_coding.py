@@ -1,12 +1,11 @@
-"""
+'''
 Define price momentum characteristic as past 12 months' stock returns skipping one month.
 
 Define volatility as the average of squared monthly stock returns over the past 12 months.
-"""
+
 import pandas as pd
 import numpy as np
 import time
-from qrafti import write_report, markdown_to_pdf
 
 # Let Coding Agent tackle these, with few-shot example from rolling()
 
@@ -19,7 +18,7 @@ def ewm(df: pd.DataFrame, agg: str = "mean", alpha: float = 1 - 0.94, min_period
 
         **kwargs: additional arguments to pass to pd.DataFrame.ewm.
     Usage:
-        panel.trend(ewm, agg="mean", alpha=1.0.94, interval=1)
+        panel.trend(ewm, agg="mean", alpha=1-0.94, interval=1)
     """
     if min_periods is None:
         min_periods = int(np.ceil(-np.log(2) / np.log(1 - alpha)))  # half-life implied by alpha
@@ -34,12 +33,40 @@ def expanding(df: pd.DataFrame, agg: str = "mean", **kwargs) -> "Panel":
         panel.trend(expanding, agg="mean", interval="1")
     """
     return df.expanding(**kwargs).agg(agg).where(df.notna())
+'''
 
+
+code_str =  '''
+from qrafti import Panel, DATES
+import pandas as pd
+import json
+
+def ewm_helper(df: pd.DataFrame, alpha: float, agg: str):
+    return df.ewm(alpha=alpha).agg(agg).where(df.notna())
+    
+stock_returns = Panel().load('RET', **DATES)
+squared_returns = stock_returns.pow(2)
+result_panel = squared_returns.trend(ewm_helper, agg='mean', alpha=1-0.94).save()
+out_dict = result_panel.as_payload()
+print(json.dumps(out_dict))
+'''
 
 if __name__ == '__main__':
+    import time
     tic = time.time()
-    
-    from qrafti import Panel
+
+
+    if True:
+        from server_utils import run_code_in_subprocess
+        import json
+        stdout, stderr, exit_code = run_code_in_subprocess(code_str)
+        # print('Exit code:', exit_code)
+        # print(stderr)
+        if exit_code:
+            out_json = json.dumps({"exit_code": exit_code, "error_message": stderr.strip()})
+        else:
+            out_json = stdout
+        print(out_json)
     
     if False: # True: # rolling regression check 11379 (10 mins for full panel)
         panel = Panel().load('RET') - Panel().load('RF')
