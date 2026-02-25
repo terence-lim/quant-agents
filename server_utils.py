@@ -33,13 +33,9 @@ def log_tool(tool: str, input: dict = {}, output: dict = {}, mode: str = "a"):
 
 def log_code(code_str: str, mode: str = "a"):
     """Server utility to keep log of code str executed"""
+    message = json.dumps(dict(date=str(datetime.now())[:19], code_str=code_str))
     with open(CODES_LOGFILE, mode) as f:
-        f.write(f'\n\nCODE EXECUTED at {now()}:\n\n')
-        for line in code_str.split('\n'):
-            line = line.rstrip()
-            if line:
-                f.write(line)
-                f.write('\n')
+        f.write(message + "\n")
         f.flush()
 
 

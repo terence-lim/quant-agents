@@ -16,7 +16,7 @@ from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.models.google import GoogleModel, GoogleModelSettings
 import logging
 
-from client_utils import load_objects, generate_dot, restart, store_conversation
+from client_utils import load_objects, generate_dot, restart, store_conversation, load_recent_code_logs
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -443,7 +443,7 @@ with st.sidebar:
     st.header("Navigation")
     page = st.radio(
         "Go to",
-        ["Agent Chat", "Output Plots", "Computation Graph"],
+        ["Agent Chat", "Output Plots", "Computation Graph", "Custom Code"],
         label_visibility="collapsed",
     )
 
@@ -595,3 +595,20 @@ elif page == "Computation Graph":
                 st.session_state.cg_last_success = False
                 st.error(f"Failed to generate graph: {e}")
 
+# --- TAB 4: CUSTOM CODE ---
+elif page == "Custom Code":
+    st.title("Custom Code")
+
+    recent_codes = load_recent_code_logs(max_items=5)
+    if not recent_codes:
+        st.info("No code logs found.")
+    else:
+        dates = [obj["date"] for obj in recent_codes]
+        with st.sidebar:
+            st.header("Code Selector")
+            selected_date = st.radio("Select execution date:", dates, index=0)
+
+        selected_obj = next((obj for obj in recent_codes if obj["date"] == selected_date), None)
+        if selected_obj:
+            st.subheader(f"Executed at: {selected_obj['date']}")
+            st.code(selected_obj.get("code_str", ""), language="python")
