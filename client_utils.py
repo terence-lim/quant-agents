@@ -1,6 +1,7 @@
 # search_logs.py
 # TO DO: add optional list of input_args keys to include in graph nodes, e.g. "month", "cuts" 
 import json
+import os
 from typing import Dict, Any, List, Set, Tuple
 from collections import deque
 import re
@@ -8,7 +9,7 @@ import html
 from datetime import datetime
 from graphviz import Source
 
-from server_utils import TOOLS_LOGFILE
+from server_utils import TOOLS_LOGFILE, CODES_LOGFILE
 from utils import DataCache
 
 def store_conversation(debug_text: str = ''):
@@ -22,6 +23,29 @@ def restart(logname: str = TOOLS_LOGFILE):
     # write to "tools.log"
     with open(logname, "w") as f:
         f.write("")
+
+
+def load_recent_code_logs(max_items: int = 5, filename: str = CODES_LOGFILE) -> List[dict]:
+    """Load up to max_items most recent JSON code-log objects."""
+    if not filename or not os.path.exists(filename):
+        return []
+
+    records: List[dict] = []
+    with open(filename, "r", encoding="utf-8") as f:
+        for line in f:
+            row = line.strip()
+            if not row:
+                continue
+            try:
+                obj = json.loads(row)
+            except json.JSONDecodeError:
+                # Skip legacy/non-JSON entries.
+                continue
+            if isinstance(obj, dict) and "date" in obj and "code_str" in obj:
+                records.append(obj)
+
+    records = sorted(records, key=lambda x: x.get("date", ""), reverse=True)
+    return records[:max_items]
 
 
 def load_objects(filename: str = TOOLS_LOGFILE) -> Dict[str, dict]:
