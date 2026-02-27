@@ -16,7 +16,8 @@ from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.models.google import GoogleModel, GoogleModelSettings
 import logging
 
-from client_utils import load_objects, generate_dot, restart, store_conversation, load_recent_code_logs
+from client_utils import (load_objects, generate_dot, restart, store_conversation,
+                          load_recent_code_logs, SUBGRAPH_PNG)
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -565,9 +566,11 @@ elif page == "Computation Graph":
             st.error(f"Error loading panels: {e}")
 
     # If we previously generated successfully, show the existing image on page load
-    if st.session_state.cg_last_success and os.path.exists("subgraph.png"):
+    if st.session_state.cg_last_success and os.path.exists(SUBGRAPH_PNG):
         caption_key = st.session_state.cg_last_start_key or "(previous)"
-        image_slot.image("subgraph.png", caption=f"Computation Graph {caption_key}", width='content')
+        image_slot.image(SUBGRAPH_PNG,
+                         caption=f"Computation Graph {caption_key}",
+                         width='content')
 
     # Button action: clear old image display, generate, then display new image
     if generate_btn:
@@ -584,10 +587,12 @@ elif page == "Computation Graph":
                 with st.spinner("Generating subgraph..."):
                     generate_dot(objects, start_key)
 
-                if os.path.exists("subgraph.png"):
+                if os.path.exists(SUBGRAPH_PNG):
                     st.session_state.cg_last_success = True
                     st.session_state.cg_last_start_key = start_key
-                    image_slot.image("subgraph.png", caption=f"Computation Graph {start_key}", width='content')
+                    image_slot.image(SUBGRAPH_PNG,
+                                     caption=f"Computation Graph {start_key}",
+                                     width='content')
                 else:
                     st.session_state.cg_last_success = False
                     st.error("subgraph.png was not generated. Check if graphviz is installed.")

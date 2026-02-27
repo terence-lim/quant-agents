@@ -10,10 +10,12 @@ from datetime import datetime
 from graphviz import Source
 
 from server_utils import TOOLS_LOGFILE, CODES_LOGFILE
-from utils import DataCache
+from utils import DataCache, OUTPUT
+
+SUBGRAPH_PNG = str(OUTPUT / "subgraph.png")
 
 def store_conversation(debug_text: str = ''):
-    with (open("conversation.txt", 'w') as f):
+    with (open(OUTPUT / "conversation.txt", 'w') as f):
         f.write(f"=== {str(datetime.now())} ===\n")
         f.write(debug_text)
         f.flush()
@@ -25,7 +27,10 @@ def restart(logname: str = TOOLS_LOGFILE):
         f.write("")
 
 
-def load_recent_code_logs(max_items: int = 5, filename: str = CODES_LOGFILE) -> List[dict]:
+def load_recent_code_logs(
+        max_items: int = 5,
+        filename: str = CODES_LOGFILE
+) -> List[dict]:
     """Load up to max_items most recent JSON code-log objects."""
     if not filename or not os.path.exists(filename):
         return []
@@ -469,12 +474,12 @@ def generate_dot(objects, start_key):
 
     #dot = generate_graphviz(objects)
     dot = generate_graphviz(objects, start_node=start_key)
-    with open("subgraph.dot", "w") as f:
+    with open(OUTPUT / "subgraph.dot", "w") as f:
         f.write(dot)
     src = Source(dot)
     src.format = "png"
-    src.render("subgraph", cleanup=True)
-    return "subgraph.png"
+    src.render(str(OUTPUT / "subgraph"), cleanup=True)
+    return SUBGRAPH_PNG
 
 if __name__ == "__main__":
     objects = load_objects()

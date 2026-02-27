@@ -9,9 +9,10 @@ from typing import Union, Dict
 
 from qrafti import Panel
 from rag import RAG
+from utils import OUTPUT
 
-TOOLS_LOGFILE = "tools.log"
-CODES_LOGFILE = "codes.log"
+TOOLS_LOGFILE = str(OUTPUT / "tools.log")
+CODES_LOGFILE = str(OUTPUT / "codes.log")
 
 def now():
     return str(datetime.now())[:19]
@@ -133,9 +134,9 @@ def int_or_None(x: str) -> Union[float, None]:
 #
 ###########################
 def run_code_in_subprocess(code_str):
-    with open("/home/terence/Dropbox/github/thesis/quant-agents/coding.log", "w") as f:
-        f.write(f"RUN CODE IN SUBPROCESS: {code_str}\n")
-        f.flush()
+    #with open("coding.log", "w") as f:
+    #    f.write(f"RUN CODE IN SUBPROCESS: {code_str}\n")
+    #    f.flush()
 
     env = os.environ.copy()
     # prepend your project root to PYTHONPATH

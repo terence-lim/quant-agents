@@ -22,6 +22,7 @@ CRSP_RAG_PATH = Path("/home/terence/Downloads/scratch/2024/JKP/CRSP_RAG")
 
 MEDIA = Path("/home/terence/Downloads/scratch/2024/JKP/media")
 WORKSPACE = Path("/home/terence/Downloads/scratch/2024/JKP/workspace")
+OUTPUT = Path("output")
 
 STOCK_NAME = "permno"
 DATE_NAME = "eom"
