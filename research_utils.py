@@ -66,14 +66,19 @@ def digitize(x, cuts: int | List[float], ascending: bool = True) -> pd.Series:
         q = np.concatenate([[0], cuts, [1]])
     else:
         q = np.linspace(0, 1, cuts + 1)
+
     breakpoints = x.loc[x.iloc[:, 1].astype(bool), x.columns[0]].quantile(q=q).values
     breakpoints[0] = -np.inf
     breakpoints[-1] = np.inf
-    # Degenerate cross-sections can produce repeated quantile edges (e.g., [6, 6]).
-    # Collapse duplicates so pd.cut always receives strictly increasing bin edges.
-    breakpoints = np.unique(breakpoints)
-    if len(breakpoints) == 1:
+    train_values = x.loc[x.iloc[:, 1].astype(bool), x.columns[0]]
+    raw_breakpoints = train_values.quantile(q=q).values.astype(float)
+
+    # Remove NaN/inf quantile edges first, then enforce strictly increasing bins.
+    raw_breakpoints = raw_breakpoints[np.isfinite(raw_breakpoints)]
+    if raw_breakpoints.size == 0:
         breakpoints = np.array([-np.inf, np.inf])
+    else:
+        breakpoints = np.concatenate(([-np.inf], np.unique(raw_breakpoints), [np.inf]))
 
     labels = range(1, len(breakpoints))
     ranks = pd.cut(
@@ -84,7 +89,7 @@ def digitize(x, cuts: int | List[float], ascending: bool = True) -> pd.Series:
     )
     if not ascending:
         ranks = len(breakpoints) - ranks.astype(int) + 1
-    return ranks.astype(int)
+    return ranks.astype(int)        
 
 
 def portfolio_weights(x) -> pd.Series:
