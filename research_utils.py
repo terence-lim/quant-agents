@@ -69,10 +69,17 @@ def digitize(x, cuts: int | List[float], ascending: bool = True) -> pd.Series:
     breakpoints = x.loc[x.iloc[:, 1].astype(bool), x.columns[0]].quantile(q=q).values
     breakpoints[0] = -np.inf
     breakpoints[-1] = np.inf
+    # Degenerate cross-sections can produce repeated quantile edges (e.g., [6, 6]).
+    # Collapse duplicates so pd.cut always receives strictly increasing bin edges.
+    breakpoints = np.unique(breakpoints)
+    if len(breakpoints) == 1:
+        breakpoints = np.array([-np.inf, np.inf])
+
+    labels = range(1, len(breakpoints))
     ranks = pd.cut(
         x.iloc[:, 0],
         bins=breakpoints,
-        labels=range(1, len(breakpoints)),
+        labels=labels,
         include_lowest=True,
     )
     if not ascending:
@@ -400,5 +407,3 @@ def portfolio_returns(port_weights: "Panel") -> "Panel":
         stock_returns = Panel().load("ret_exc_lead1m", **dates)
     port_weights = portfolio_impute(port_weights, normalize=True)
     return (port_weights @ stock_returns).shift(1)
-
-
