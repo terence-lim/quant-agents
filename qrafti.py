@@ -1,8 +1,6 @@
 # qrafti.py  (c) Terence Lim
 
-from utils import DataCache, Calendar, MEDIA, STOCK_NAME, DATE_NAME
-from portfolio import PortfolioEvaluation
-
+from utils import DataCache, Calendar, CRSP_RAG_PATH, JKP_RAG_PATH
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
@@ -20,23 +18,21 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 logging.disable(logging.DEBUG)
 #pd.set_option("future.no_silent_downcasting", True)  # for fillna behavior
 
-def plt_savefig() -> str:
-    """Helper to save a matplotlib figure with a timestamped filename in the MEDIA directory."""
-    savefig = Path(MEDIA) / f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}.png'
-    plt.savefig(savefig)
-    return 'file:///' + str(savefig)
+STOCK_NAME = "permno"
+DATE_NAME = "eom"
 
 #
-# These are temporarily here, should be in utils.py...
+# These are temporarily here, perhaps should be in utils.py...
 #
-DATES = dict(start_date="2020-01-01", end_date="2024-12-31")
+#DATES = dict(start_date="2020-01-01", end_date="2024-12-31")
 #DATES = dict(start_date="2001-01-01", end_date="2024-12-31")
+DATES = dict(start_date="1993-01-01", end_date="2024-12-31")
 
 CRSP_VERSION = True
 if CRSP_VERSION:
-    RAG_PATH = Path("/home/terence/Downloads/scratch/2024/JKP/CRSP_RAG")
+    RAG_PATH = CRSP_RAG_PATH
 else:
-    RAG_PATH = Path("/home/terence/Downloads/scratch/2024/JKP/JKP_RAG")
+    RAG_PATH = JKP_RAG_PATH
 
 
 ###########################
@@ -726,6 +722,7 @@ class Panel:
 
 if __name__ == "__main__":
     import warnings
+    from utils import OUTPUT
     warnings.filterwarnings("error", category=RuntimeWarning)
     tic = time.time()
     print(str(datetime.now()))
@@ -734,6 +731,31 @@ if __name__ == "__main__":
     # Helpers to display Panels
     #
 
+    def evaluate_panels(panel: Panel, ground: Panel, experiment: str = '') -> pd.DataFrame:
+        """Evaluate two Panels side by side"""
+        if panel.nlevels != ground.nlevels or panel.nlevels < 1:
+            return None
+        output = dict()
+        output['panel_dates'] = len(panel.dates)
+        output['ground_dates'] = len(ground.dates)    
+        output['panel_rows'] = len(panel)
+        output['ground_rows'] = len(ground)
+        both = panel.frame.dropna().join(ground.frame.dropna(), how="inner", rsuffix="_ground")
+        output['both_rows'] = len(both)
+        output['both_dates'] = len(both.index.get_level_values(0).unique())
+        output['spearman'] = both.corr(method="spearman").iloc[0, 1]
+        output['pearson'] = both.corr(method="pearson").iloc[0, 1]
+        # difference of means, divided by average standard deviation
+        output['diff_stdz'] = ((both.iloc[:, 0].mean() - both.iloc[:, 1].mean()) / 
+                              ((both.iloc[:, 0].std() + both.iloc[:, 1].std()) / 2))
+        with open(OUTPUT / 'evaluation.csv', 'a') as f:
+            if f.tell() == 0:
+                f.write("experiment & panel_dates & ground_dates & both_dates & panel_rows & ground_rows & both_rows & spearman & pearson & diff_stdz\n")
+            f.write(f"{experiment} & {output['panel_dates']} & {output['ground_dates']} & {output['both_dates']} & "
+                    f"{output['panel_rows']} & {output['ground_rows']} & {output['both_rows']} & "
+                    f"{output['spearman']:.4f} & {output['pearson']:.4f} & {output['diff_stdz']:.4f}\n")
+        return pd.DataFrame(output, index=[experiment])
+    
     def panel_info(panel: Panel) -> Dict[str, Any]:
         """Return basic information about this Panel."""
         info = {"nlevels": panel.nlevels, "rows": len(panel)}

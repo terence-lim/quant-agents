@@ -11,6 +11,9 @@ from qrafti import Panel
 from rag import RAG
 from utils import OUTPUT
 
+from dotenv import load_dotenv
+load_dotenv()
+    
 TOOLS_LOGFILE = str(OUTPUT / "tools.log")
 CODES_LOGFILE = str(OUTPUT / "codes.log")
 
@@ -139,10 +142,10 @@ def run_code_in_subprocess(code_str):
     #    f.flush()
 
     env = os.environ.copy()
+    
     # prepend your project root to PYTHONPATH
-    env["PYTHONPATH"] = (
-        "/home/terence/Dropbox/github/thesis/quant-agents:" + env.get("PYTHONPATH", "")
-    )
+    project_root = os.getenv("PROJECT_ROOT", "")
+    env["PYTHONPATH"] = (project_root + ":" + env.get("PYTHONPATH", "")).strip(":")
     proc = subprocess.run(
         [sys.executable, "-c", code_str], capture_output=True, text=True, env=env
     )

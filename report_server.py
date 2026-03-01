@@ -16,7 +16,7 @@ mcp = FastMCP("report-server", host="0.0.0.0", port=port)
 
 
 @mcp.tool()
-def Panel_protocol_report(panel_id: str, description: str = '') -> str:
+def Panel_standardized_report(panel_id: str, description: str = '') -> str:
     """Returns prompt string, including computed summary tables, for generating a
     report to evaluate a Panel containing stock characteristics for predicting stock returns.
 
@@ -28,11 +28,11 @@ def Panel_protocol_report(panel_id: str, description: str = '') -> str:
     """
 
     prompt_str = f"""
-You are a quantitative researcher asked to write a report following
-a specific protocol, to analyze a candidate financial characteristic for predicting stock returns: '{description}'.
+You are a quantitative researcher asked to write a standardized report, following a specific protocol,
+to analyze a candidate financial characteristic for predicting stock returns: '{description}'.
 
 Please also provide a catchy title name for the characteristic, and
-follow these specific guidelines for writing the research protocol report:
+follow these specific guidelines for writing the standardized research report:
 
 ## Motivation (1 paragraph, ~100 words): 
     * Broad statement on market efficiency or asset pricing. 
@@ -78,7 +78,7 @@ Base the Results section strictly on the statistical tables data, matching its t
         out = dict(report_prompt=report_prompt)
     except Exception as e:
         out = dict(error=traceback.format_exc())
-    log_tool(tool="Panel_protocol_report", 
+    log_tool(tool="Panel_standardized_report", 
              input=dict(panel_id=panel_id, description=description),
              output=out if 'error' in out else dict(length=f"{len(report_tables)=}"))
     return json.dumps(out)

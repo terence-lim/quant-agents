@@ -1,5 +1,7 @@
 import json
 import pandas as pd
+import matplotlib.pyplot as plt
+from datetime import datetime
 import sys
 import os
 import markdown
@@ -13,19 +15,24 @@ from typing import List, Dict
 #logging.getLogger("weasyprint").setLevel(logging.WARNING)
 #logging.disable(logging.WARNING)  # disable all logging messages at or below
 
+OUTPUT = Path("output")
+LINKS = Path("LINKS")
+
 BENCHMARKS_RAG = "benchmark_returns"
 CHARACTERISTICS_RAG = "stock_characteristics"
-JKP_RAG_PATH = Path("/home/terence/Downloads/scratch/2024/JKP/JKP_RAG")
-CRSP_RAG_PATH = Path("/home/terence/Downloads/scratch/2024/JKP/CRSP_RAG")
+#JKP_RAG_PATH = Path("/home/terence/Downloads/scratch/2024/JKP/JKP_RAG")
+JKP_RAG_PATH = LINKS / "JKP_RAG"
 
-# RAG_PATH = Path("/home/terence/Downloads/scratch/2024/JKP/RAG") # should move from qrafti.py
+#CRSP_RAG_PATH = Path("/home/terence/Downloads/scratch/2024/JKP/CRSP_RAG")
+CRSP_RAG_PATH = LINKS / "CRSP_RAG"
 
-MEDIA = Path("/home/terence/Downloads/scratch/2024/JKP/media")
-WORKSPACE = Path("/home/terence/Downloads/scratch/2024/JKP/workspace")
-OUTPUT = Path("output")
+# RAG_PATH = JKP_RAG # should move from qrafti.py
 
-STOCK_NAME = "permno"
-DATE_NAME = "eom"
+#MEDIA = Path("/home/terence/Downloads/scratch/2024/JKP/media")
+MEDIA = LINKS / "media"
+
+#WORKSPACE = Path("/home/terence/Downloads/scratch/2024/JKP/workspace")
+WORKSPACE = LINKS / "workspace"
 
 #
 # Helper utilities
@@ -52,6 +59,13 @@ class suppress_stderr():
         sys.stderr = self.original_stderr
         self.devnull.close()
 
+def plt_savefig(savefig: str = '') -> str:
+    """Helper to save a matplotlib figure with a timestamped filename in the MEDIA directory."""
+    if not savefig:
+        savefig = Path(MEDIA) / f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}.png'
+    plt.savefig(savefig)
+    return 'file:///' + str(savefig)
+        
 
 def markdown_to_pdf(
     markdown_text: str,
@@ -86,7 +100,7 @@ class Calendar:
         reference_panel: str = "TOTAL_COUNT"  # 'Mkt-RF' 'ret_exc_lead1m'
     ):
         # Initialize the Calendar with unique sorted dates from a reference Panel 'ret_exc_lead1m'
-        dates = DataCache.read_frame(reference_panel).index.get_level_values(DATE_NAME)
+        dates = DataCache.read_frame(reference_panel).index.get_level_values(0)
         if start_date:
             dates = dates[dates >= start_date]
         if end_date:

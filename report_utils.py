@@ -1,4 +1,7 @@
-from qrafti import Panel
+from qrafti import Panel, DATE_NAME, STOCK_NAME
+from utils import plt_savefig, MEDIA
+from portfolio import PortfolioEvaluation
+from research_utils import digitize, portfolio_weights, portfolio_returns
 import json
 import pandas as pd
 import numpy as np
@@ -34,7 +37,7 @@ def returns_regression(port_returns: Panel, fac_returns: List[Panel] = []) -> Tu
     factor_frames = [factor.frame for factor in fac_returns if factor.nlevels == 1]
     return PortfolioEvaluation(returns=port_returns.frame).regression(factor_frames)
 
-def write_report(signal: Panel) -> str:
+def write_report(signal: Panel, savefig: str = MEDIA / 'output.png') -> str:
     """Compute factor returns and performance statistics from stock characteristics
     Arguments:
         signal: Panel of stock characteristic values from which to calculate and evaluate factor returns
@@ -108,6 +111,17 @@ def write_report(signal: Panel) -> str:
 
     # Evaluate returns
     returns = portfolio_returns(portfolio)
+    if savefig:
+        # Plot cumulative returns
+        cumulative_returns = returns.frame.cumsum()
+        plt.figure(figsize=(10, 6))
+        plt.plot(cumulative_returns.index, cumulative_returns.iloc[:, 0], label='Cumulative Return')
+        plt.xlabel('Date')
+        plt.ylabel('Cumulative Return')
+        plt.title('Cumulative Returns of Tercile Spread Portfolio')
+        plt.tight_layout()
+        plt_savefig(savefig)
+        plt.close()
     stats = returns_metrics(returns)
     df = pd.Series(stats, name="High minus Low").to_frame().T
     context.append(

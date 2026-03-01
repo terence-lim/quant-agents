@@ -1,0 +1,8 @@
+experiment & panel_dates & ground_dates & both_dates & panel_rows & ground_rows & both_rows & spearman & pearson & diff_stdz
+ & 361 & 361 & 361 & 361 & 361 & 361 & 0.9784 & 0.9829 & -0.0055
+ & 372 & 384 & 372 & 372 & 384 & 372 & 0.9997 & 0.9998 & -0.0034
+ & 372 & 384 & 372 & 372 & 384 & 372 & 0.9997 & 0.9998 & -0.0034
+ & 372 & 372 & 372 & 372 & 372 & 372 & 0.9997 & 0.9998 & -0.0034
+ & 372 & 361 & 361 & 372 & 361 & 361 & -0.2486 & -0.2446 & 0.0738
+EWMA volatility with custom code and standardized reporting} & 373 & 373 & 373 & 1856988 & 1856988 & 1856988 & 0.9864 & 0.9450 & 0.0017
+EWMA volatility with custom code and standardized reporting} & 373 & 373 & 373 & 1856988 & 1856988 & 1856988 & 1.0000 & 1.0000 & -0.0000

@@ -1,7 +1,8 @@
 # start.py  (c) Terence Lim 2025
 
-from utils import as_nptype, STOCK_NAME, DATE_NAME, BENCHMARKS_RAG, CHARACTERISTICS_RAG, JKP_RAG_PATH, CRSP_RAG_PATH
-from qrafti import Panel
+from utils import (as_nptype, LINKS, CRSP_DATA, PSTAT_DATA,
+                   BENCHMARKS_RAG, CHARACTERISTICS_RAG, JKP_RAG_PATH, CRSP_RAG_PATH)
+from qrafti import Panel, STOCK_NAME, DATE_NAME
 from rag import RAG
 
 from pathlib import Path
@@ -16,18 +17,13 @@ from pprint import pprint, pformat
 
 import logging
 
-logging.basicConfig(level=logging.DEBUG)  # 10 Detailed info for debugging
+logging.basicConfig(level=logging.DEBUG)
 # logging.disable(logging.CRITICAL)  # DEBUG, INFO, WARNING, ERROR, CRITICAL
 
 # RAW DATA PATHS
-CRSP_DATA = Path("/home/terence/Downloads/scratch/2024/CRSP")
-PSTAT_DATA = Path("/home/terence/Downloads/scratch/2024/PSTAT")
-DATA_LAKE = Path("/home/terence/Downloads/scratch/2024/JKP")
+#DATA_LAKE = Path("/home/terence/Downloads/scratch/2024/JKP")
+DATA_LAKE = LINKS / "JKP"
 BENCHMARKS_DIR = DATA_LAKE / "benchmarks"
-
-# Cheatsheet:
-# pd.to_datetime(dates, format="%Y%m%d") + pd.offsets.MonthEnd(0)
-
 
 class Lookup:
     def __init__(self, source: str = "gvkey", sep="\t"):
@@ -625,11 +621,11 @@ if __name__ == "__main__":
         RAG(BENCHMARKS_RAG, out_dir=CRSP_RAG_PATH).load().add_documents(pd.Series(keep), overwrite=False)
         RAG(BENCHMARKS_RAG, out_dir=JKP_RAG_PATH).load().add_documents(pd.Series(keep), overwrite=False)
 
-    # ###########################
-    # #
-    # # Load CRSP monthly data
-    # #
-    # ###########################
+    ###########################
+    #
+    # Load CRSP monthly data
+    #
+    ###########################
 
     if True:
     #df_data = load_crsp()

@@ -3,10 +3,10 @@ from mcp.server.fastmcp import FastMCP
 import json
 from server_utils import run_code_in_subprocess, log_code
 import logging
-logging.basicConfig(level=logging.INFO)
+#logging.basicConfig(level=logging.INFO)
 
 #import logging
-#logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG)
 
 # Create an MCP server
 mcp = FastMCP("coding-server", host="0.0.0.0", port=8003)
@@ -26,6 +26,8 @@ def execute_python(code_str: str) -> str:
     if exit_code:
         return json.dumps({"exit_code": exit_code, "error_message": stderr.strip()})
     else:
+        logging.warning(stdout)
+        print('STDOUT:', stdout)
         return stdout
 
 if __name__ == "__main__":
