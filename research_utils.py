@@ -67,10 +67,16 @@ def digitize(x, cuts: int | List[float], ascending: bool = True) -> pd.Series:
     else:
         q = np.linspace(0, 1, cuts + 1)
 
-    breakpoints = x.loc[x.iloc[:, 1].astype(bool), x.columns[0]].quantile(q=q).values
-    breakpoints[0] = -np.inf
-    breakpoints[-1] = np.inf
-    train_values = x.loc[x.iloc[:, 1].astype(bool), x.columns[0]]
+    values = x.iloc[:, 0].copy()
+    mask = x.iloc[:, 1].copy()
+
+    # Replace missing values with each column's median so ranks stay integer-valued.
+    values_median = values.dropna().median()
+    mask_median = mask.dropna().median()
+    values = values.fillna(values_median if pd.notna(values_median) else 0.0)
+    mask = mask.fillna(mask_median if pd.notna(mask_median) else 0.0)
+
+    train_values = values.loc[mask.astype(bool)]
     raw_breakpoints = train_values.quantile(q=q).values.astype(float)
 
     # Remove NaN/inf quantile edges first, then enforce strictly increasing bins.
@@ -82,14 +88,14 @@ def digitize(x, cuts: int | List[float], ascending: bool = True) -> pd.Series:
 
     labels = range(1, len(breakpoints))
     ranks = pd.cut(
-        x.iloc[:, 0],
+        values,
         bins=breakpoints,
         labels=labels,
         include_lowest=True,
-    )
+    ).astype(int)
     if not ascending:
-        ranks = len(breakpoints) - ranks.astype(int) + 1
-    return ranks.astype(int)        
+        ranks = len(breakpoints) - ranks + 1
+    return ranks
 
 
 def portfolio_weights(x) -> pd.Series:
