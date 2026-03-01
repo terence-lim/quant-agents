@@ -75,6 +75,14 @@ def digitize(x, cuts: int | List[float], ascending: bool = True) -> pd.Series:
         breakpoints = np.array([-np.inf, np.inf])
     else:
         breakpoints = np.concatenate(([-np.inf], np.unique(raw_breakpoints), [np.inf]))
+    breakpoints = x.loc[x.iloc[:, 1].astype(bool), x.columns[0]].quantile(q=q).values
+    breakpoints[0] = -np.inf
+    breakpoints[-1] = np.inf
+    # Degenerate cross-sections can produce repeated quantile edges (e.g., [6, 6]).
+    # Collapse duplicates so pd.cut always receives strictly increasing bin edges.
+    breakpoints = np.unique(breakpoints)
+    if len(breakpoints) == 1:
+        breakpoints = np.array([-np.inf, np.inf])
 
     labels = range(1, len(breakpoints))
     ranks = pd.cut(
