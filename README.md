@@ -3,16 +3,17 @@
 (c) Terence Lim 2026
 
 A tool-augmented multi-agent framework designed to emulate a
-quantitative research team. QRAFTI integrates (1) an empirical research
-toolkit built for *(date, stock)* panel data, (2) Model Context Protocol
-(MCP) tool servers that expose data- and factor-manipulation
-operations as callable tools, (3) specialized agents for factor research,
-standardized reporting, and customized code writing and execution, and
-(4) Streamlit dashboards for tracing tool calls and visualizing data
-artifact connections. It demonstrates the use of LLM and agentic
-capabilities to simplify and strengthen quantitative research
-workflows.
+quantitative research team, QRAFTI integrates (1) an empirical
+research Python toolkit built for *(date, stock)* panel data, (2)
+Model Context Protocol (MCP) tool servers that expose data- and
+factor-manipulation operations as callable tools, (3) specialized
+Pydantic-AI agents for factor research, standardized reporting, and
+customized code writing and execution, and (4) Streamlit interface
+for tracing tool calls and visualizing data artifact connections. It
+demonstrates the use of LLM and agentic capabilities to simplify and
+strengthen quantitative research workflows.
 
+[Download the documentation and case studies appendix](Appendix.pdf)
 
 ## Example Prompts for Using QRAFTI
 
@@ -43,7 +44,7 @@ Finally, create a scatter plot of the factor returns against its benchmark retur
 Compute the correlation between the factor returns and the benchmark
 ```
 
-### 2) Replicate JKP-style workflow
+### 2) Replicate JKP-style price momentum factor workflow
 
 ```text
 Please use these three phases of the reflexion prompt technique to perform the query below.
@@ -96,7 +97,7 @@ Provides the service-side components for exposing factor computations, custom to
 ### 2) Client Access Layer
 **Files:** `st_client.py`, `client_utils.py`
 
-Contains the client-side interface used to connect to and interact with the service layer. `client_utils.py` centralizes reusable client helpers, while `st_client.py` serves as the primary client implementation in Pydantic-ai and Streamlit.
+Contains the client-side interface used to connect to and interact with the service layer. `client_utils.py` centralizes reusable client helpers, while `st_client.py` serves as the primary client implementation in Pydantic-AI and Streamlit.
 
 ### 3) Financial Intelligence Toolkit
 **Files:** `qrafti.py`, `utils.py`, `portfolio.py`, `rag.py`, `reboot.py`
