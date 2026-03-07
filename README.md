@@ -4,13 +4,13 @@
 
 A tool-augmented multi-agent framework designed to emulate a
 quantitative research team. QRAFTI integrates an empirical research
-toolkit built for *(date, stock)* panel data, Model Context
-Protocol (MCP) tool servers that expose factor-research and
-data-manipulation operations as callable tools, and specialized agents for
-factor research, standardized reporting, and customized code writing
-and execution. It demonstrates the use of LLM capabilities to
-streamline and strengthen quantitative research workflows while
-improving auditability.
+toolkit built for *(date, stock)* panel data, Model Context Protocol
+(MCP) tool servers that expose data- and factor-manipulation
+operations as callable tools, and specialized agents for factor
+research, standardized reporting, and customized code writing and
+execution. It demonstrates the use of LLM capabilities to streamline
+and strengthen quantitative research workflows while improving
+auditability.
 
 
 ## Example Prompts for Using QRAFTI
@@ -47,7 +47,9 @@ Compute the correlation between the factor returns and the benchmark
 ```text
 Please use these three phases of the reflexion prompt technique to perform the query below.
 Phase 1: Consider the entire query, and suggest a sequential order of steps to perform the query.
-Phase 2: To reflect and self-critique, check that each step is implementable with available tools and that the steps can efficiently satisfy the objective of the query; you may query the user to provide any needed definitions.
+Phase 2: To reflect and self-critique, check that each step is implementable with available tools and
+  that the steps can efficiently satisfy the objective of the query; you may query the user to provide
+  any needed definitions.
 Phase 3: Provide the corrected plan, but do not execute the steps yet.
 
 Query:
@@ -59,7 +61,8 @@ is below the NYSE 20th percentile.
 For each tercile, compute its "capped value" weighted portfolio, meaning that we weight stocks
 by their market equity winsorized at the NYSE 80th percentile.
 
-The factor returns are then defined as the top-tercile portfolio return minus the bottom-tercile portfolio return.
+The factor returns are then defined as the top-tercile portfolio return minus the bottom-tercile
+portfolio return.
 
 Create a scatter plot of the factor returns against its benchmark returns (Panel ID 'ret_12_1_ret_vw_cap').
 ```
@@ -67,7 +70,12 @@ Create a scatter plot of the factor returns against its benchmark returns (Panel
 ### 3) Autonomously generate and test a new factor idea
 
 ```text
-Please suggest an innovative stock characteristic that can be constructed from commonly-available financial statement items in Compustat and monthly stock returns in CRSP which implements the investment philosophy of the renowned investor Warren Buffet. You should not write custom pytho code, but can use all of the other tools available to you. Guidelines:
+Please suggest an innovative stock characteristic that can be constructed from commonly-available
+financial statement items in Compustat and monthly stock returns in CRSP which implements the
+investment philosophy of the renowned investor Warren Buffet. You should not write custom pytho code,
+but can use all of the other tools available to you.
+
+Guidelines:
 - Any data items which are source from Compustat Annual must be lagged six months
 - When combining components, the components should be first resampled every June.
 - Prefer components and scores to be standardized real values, not quantile ranks.
