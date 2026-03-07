@@ -3,13 +3,15 @@
 (c) Terence Lim 2026
 
 A tool-augmented multi-agent framework designed to emulate a
-quantitative research team. QRAFTI integrates an empirical research
-toolkit built for *(date, stock)* panel data, Model Context Protocol
+quantitative research team. QRAFTI integrates (1) an empirical research
+toolkit built for *(date, stock)* panel data, (2) Model Context Protocol
 (MCP) tool servers that expose data- and factor-manipulation
-operations as callable tools, and specialized agents for factor
-research, standardized reporting, and customized code writing and
-execution. It demonstrates the use of LLM capabilities to streamline
-and strengthen quantitative research workflows.
+operations as callable tools, (3) specialized agents for factor research,
+standardized reporting, and customized code writing and execution, and
+(4) Streamlit dashboards for tracing tool calls and visualizating data
+artifact connections. It demonstrates the use of LLM and agentic
+capabilities to simplify and strengthen quantitative research
+workflows.
 
 
 ## Example Prompts for Using QRAFTI
@@ -71,7 +73,7 @@ Create a scatter plot of the factor returns against its benchmark returns (Panel
 ```text
 Please suggest an innovative stock characteristic that can be constructed from commonly-available
 financial statement items in Compustat and monthly stock returns in CRSP which implements the
-investment philosophy of the renowned investor Warren Buffet. You should not write custom pytho code,
+investment philosophy of the renowned investor Warren Buffet. You should not write custom python code,
 but can use all of the other tools available to you.
 
 Guidelines:
