@@ -9,8 +9,7 @@ toolkit built for *(date, stock)* panel data, Model Context Protocol
 operations as callable tools, and specialized agents for factor
 research, standardized reporting, and customized code writing and
 execution. It demonstrates the use of LLM capabilities to streamline
-and strengthen quantitative research workflows while improving
-auditability.
+and strengthen quantitative research workflows.
 
 
 ## Example Prompts for Using QRAFTI
