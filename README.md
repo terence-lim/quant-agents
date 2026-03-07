@@ -1,8 +1,84 @@
 # Quantitative Research Assistants with Financial Tools and Intelligence (QRAFTI)
 
-Python modules for running *multi-agent* quantitative research workflows, including data/factor services, user access interface, and empirical analysis tooling.
+(c) Terence Lim 2026
+
+A tool-augmented multi-agent framework designed to emulate a
+quantitative research team. QRAFTI integrates an empirical research
+toolkit built for \emph{(date, stock)} panel data, Model Context
+Protocol (MCP) tool servers that expose factor-research and
+data-manipulation operations as callable tools
+\citep{anthropic2024mcp, mcp2025spec}, and specialized agents for
+factor research, standardized reporting, and customized code writing
+and execution. It demonstrates the use of LLM capabilities to
+streamline and strengthen quantitative research workflows while
+improving auditability.
+
+
+## Example Prompts for Using QRAFTI
+
+Use the following prompts to illustrate how a user can work with QRAFTI for replication studies and autonomous factor research.
+
+### 1) Replicate HML-style workflow
+
+```text
+Construct book equity as stockholder equity (seq) minus the book value of preferred stock,
+where preferred stock is defined as the redemption (pstkrv), liquidation (pstkl), or par value (pstk),
+if available, in that order.
+
+Each December, divide book equity of a firm’s fiscal year-end at or before December
+by the company market capitalization (CAPCO) at the end of the year.
+Then construct book-to-market equity in June as the lagged values from the previous December.
+
+Sort stocks independently on market equity (CAP) into small and big stocks using
+the median market capitalization of all stocks traded on the NYSE as breakpoints,
+and on book-to-market equity into growth, neutral, and value stocks using
+the 30th and 70th percentiles of book-to-market equity of all stocks traded on the NYSE as breakpoints.
+
+Form portfolios as the intersection of these sorts. The portfolios are weighted by market equity (CAP).
+The HML factor portfolio is the average of a small and a big value portfolio minus the average of a
+small and a big growth portfolio in each month.
+
+Finally, create a scatter plot of the factor returns against its benchmark returns (with panel ID 'HML').
+
+Compute the correlation between the factor returns and the benchmark
+```
+
+### 2) Replicate JKP-style workflow
+
+```text
+Please use these three phases of the reflexion prompt technique to perform the query below.
+Phase 1: Consider the entire query, and suggest a sequential order of steps to perform the query.
+Phase 2: To reflect and self-critique, check that each step is implementable with available tools and that the steps can efficiently satisfy the objective of the query; you may query the user to provide any needed definitions.
+Phase 3: Provide the corrected plan, but do not execute the steps yet.
+
+Query:
+Define price momentum characteristic as stocks' past 12 months returns skipping one month.
+Sort stocks into characteristic terciles (top/middle/bottom third) with breakpoints
+based on non-micro stocks, where micro stocks are all stocks whose market capitalization
+is below the NYSE 20th percentile.
+
+For each tercile, compute its "capped value" weighted portfolio, meaning that we weight stocks
+by their market equity winsorized at the NYSE 80th percentile.
+
+The factor returns are then defined as the top-tercile portfolio return minus the bottom-tercile portfolio return.
+
+Create a scatter plot of the factor returns against its benchmark returns (Panel ID 'ret_12_1_ret_vw_cap').
+```
+
+### 3) Autonomously generate and test a new factor idea
+
+```text
+Please suggest an innovative stock characteristic that can be constructed from commonly-available financial statement items in Compustat and monthly stock returns in CRSP which implements the investment philosophy of the renowned investor Warren Buffet. You should not write custom pytho code, but can use all of the other tools available to you. Guidelines:
+- Any data items which are source from Compustat Annual must be lagged six months
+- When combining components, the components should be first resampled every June.
+- Prefer components and scores to be standardized real values, not quantile ranks.
+
+Please execute the plan and provide a standardized research report.
+```
 
 ## Project Structure
+
+Python modules for running *multi-agent* quantitative research workflows, including data/factor services, user access interface, and empirical analysis tooling.
 
 ### 1) Research Service Layer
 **Files:** `factor_server.py`, `coding_server.py`, `report_server.py`, `server_utils.py`, `research_utils.py`, `report_utils.py`
