@@ -4,10 +4,9 @@
 
 A tool-augmented multi-agent framework designed to emulate a
 quantitative research team. QRAFTI integrates an empirical research
-toolkit built for \emph{(date, stock)} panel data, Model Context
+toolkit built for *(date, stock)* panel data, Model Context
 Protocol (MCP) tool servers that expose factor-research and
-data-manipulation operations as callable tools
-\citep{anthropic2024mcp, mcp2025spec}, and specialized agents for
+data-manipulation operations as callable tools, and specialized agents for
 factor research, standardized reporting, and customized code writing
 and execution. It demonstrates the use of LLM capabilities to
 streamline and strengthen quantitative research workflows while
