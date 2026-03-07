@@ -1,4 +1,4 @@
-# Quantitative Research Assistants with Financial Tools and Intelligence
+# Quantitative Research Assistants with Financial Tools and Intelligence (QRAFTI)
 
 Python modules for running *multi-agent* quantitative research workflows, including data/factor services, user access interface, and empirical analysis tooling.
 
