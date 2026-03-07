@@ -102,3 +102,11 @@ Contains the client-side interface used to connect to and interact with the serv
 
 Contains core analytical and orchestration modules for portfolio-focused research workflows, including shared utilities, retrieval-augmented functionality, and operational/restart helpers.
 
+### 4) Data Sources
+
+CRSP, Compustat
+
+
+![Agentic Framework](architecture.png)
+
+
