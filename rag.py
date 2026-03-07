@@ -1,0 +1,361 @@
+import os
+import pandas as pd
+import numpy as np
+import faiss
+import chromadb
+from sentence_transformers import SentenceTransformer
+from pathlib import Path
+import logging
+logging.basicConfig(level=logging.WARNING)
+# logging.disable(logging.CRITICAL) # DEBUG, INFO, WARNING, ERROR, CRITICAL
+
+
+class RAG:
+    """
+    Retrieval-Augmented Generation (RAG) pipeline with:
+      - Persistent FAISS and Chroma vector stores
+      - Persistent doc_series storage
+      - Build and load methods for full restoration
+    """
+
+    def __init__(self, name: str, out_dir: str, model_name: str = "all-MiniLM-L6-v2"):
+        """
+        Initialize RAG pipeline without requiring the documents upfront.
+        """
+        self.name = name
+        out_dir = Path(out_dir)
+        (out_dir / name).mkdir(parents=True, exist_ok=True)
+        self.faiss_index_path = str(out_dir / name / "faiss.index")
+        self.chroma_dir = str(out_dir / name / "chroma")
+        self.docs_path = str(out_dir / name / "docs.parquet")
+        self.model_name = model_name
+
+        # Ensure output directory exists
+        Path(self.chroma_dir).parent.mkdir(parents=True, exist_ok=True)
+
+        # Initialize components
+        self.model = SentenceTransformer(model_name)
+        self.client = chromadb.PersistentClient(path=self.chroma_dir)
+
+        # Holders
+        self.faiss_index = None
+        self.chroma_collection = None
+        self.doc_series = None
+
+
+    def __len__(self):
+        """Number of documents in the RAG store."""
+        if self.doc_series is None:
+            return 0
+        return len(self.doc_series)
+
+    # ============================================================
+    # INTERNAL UTILITIES
+    # ============================================================
+    def _create_embeddings(self, texts: list[str]) -> np.ndarray:
+        """Create embeddings."""
+        logging.debug(f"🔢 Creating embeddings with {self.model_name}...")
+        return np.array(self.model.encode(texts, show_progress_bar=True))
+
+    def _delete_existing_stores(self):
+        """Remove existing FAISS and Chroma stores."""
+        if os.path.exists(self.faiss_index_path):
+            os.remove(self.faiss_index_path)
+            logging.debug(f"🗑️ Deleted old FAISS index at {self.faiss_index_path}")
+        try:
+            self.client.delete_collection("docs")
+            logging.debug(f"🗑️ Deleted old Chroma collection 'docs'")
+        except Exception:
+            pass
+
+    # ============================================================
+    # FAISS
+    # ============================================================
+    def _build_faiss(self, embeddings: np.ndarray):
+        """Create and persist a new FAISS index."""
+        dim = embeddings.shape[1]
+        index = faiss.IndexFlatL2(dim)
+        index.add(embeddings)
+        faiss.write_index(index, self.faiss_index_path)
+        logging.debug(f"✅ Saved FAISS index to {self.faiss_index_path}")
+        return index
+
+    def _load_faiss(self):
+        """Load FAISS index from disk."""
+        if not os.path.exists(self.faiss_index_path):
+            raise FileNotFoundError(f"No FAISS index found at {self.faiss_index_path}")
+        logging.debug(f"🔁 Loading FAISS index from {self.faiss_index_path}")
+        return faiss.read_index(self.faiss_index_path)
+
+    # ============================================================
+    # CHROMA
+    # ============================================================
+    def _build_chroma(self, embeddings: np.ndarray):
+        """Create a fresh Chroma collection."""
+        try:
+            self.client.delete_collection("docs")
+            logging.debug("🗑️ Deleted existing Chroma collection 'docs'")
+        except Exception:
+            pass
+
+        collection = self.client.create_collection("docs")
+        collection.add(
+            documents=self.doc_series.tolist(),
+            embeddings=embeddings.tolist(),
+            ids=self.doc_series.index.astype(str).tolist(),
+        )
+        logging.debug(f"✅ Created new Chroma collection at {self.chroma_dir}")
+        return collection
+
+    def _load_chroma(self):
+        """Load existing Chroma collection."""
+        try:
+            collection = self.client.get_collection("docs")
+            logging.debug(
+                f"🔁 Loaded existing Chroma collection from {self.chroma_dir}"
+            )
+            return collection
+        except Exception as e:
+            raise FileNotFoundError(
+                f"No Chroma collection found at {self.chroma_dir}"
+            ) from e
+
+    # ============================================================
+    # DOCUMENT STORAGE
+    # ============================================================
+    def _save_doc_series(self):
+        if self.doc_series is not None:
+            self.doc_series.to_frame("text").to_parquet(self.docs_path)
+            logging.debug(f"📄 Saved document metadata to {self.docs_path}")
+
+    def _load_doc_series(self):
+        if not os.path.exists(self.docs_path):
+            raise FileNotFoundError(f"No document metadata found at {self.docs_path}")
+        df = pd.read_parquet(self.docs_path)
+        self.doc_series = df["text"]
+        self.doc_series.index = df.index.astype(str)
+        logging.debug(f"📄 Loaded document metadata from {self.docs_path}")
+
+    # ============================================================
+    # INTEGRITY CHECK
+    # ============================================================
+    def _check_integrity(self):
+        """Ensure FAISS, Chroma, and docs are consistent."""
+        logging.debug("🧩 Verifying store integrity...")
+        n_docs = len(self.doc_series)
+        faiss_count = self.faiss_index.ntotal
+        chroma_count = self.chroma_collection.count()
+
+        if faiss_count != n_docs or chroma_count != n_docs:
+            raise ValueError(
+                f"❌ Integrity error: FAISS={faiss_count}, Chroma={chroma_count}, Docs={n_docs}"
+            )
+        logging.debug(f"✅ Integrity check passed: {n_docs} documents verified.\n")
+
+    # ============================================================
+    # PUBLIC METHODS
+    # ============================================================
+    def build(self, doc_series: pd.Series) -> "RAG":
+        """Build a new RAG store, optionally forcing rebuild."""
+        logging.debug("🚀 Building RAG store...")
+
+        self._delete_existing_stores()
+
+        self.doc_series = doc_series
+        self._save_doc_series()
+
+        embeddings = self._create_embeddings(self.doc_series.tolist())
+        self.faiss_index = self._build_faiss(embeddings)
+        self.chroma_collection = self._build_chroma(embeddings)
+
+        self._check_integrity()
+        logging.debug("✅ RAG store built successfully.\n")
+        return self
+
+    def load(self) -> "RAG":
+        """Load an existing RAG store."""
+        logging.debug("🔁 Loading existing RAG store...")
+        self._load_doc_series()
+        self.faiss_index = self._load_faiss()
+        self.chroma_collection = self._load_chroma()
+        self._check_integrity()
+        logging.debug("✅ RAG store fully loaded and verified.\n")
+        return self
+
+    def retrieve(self, query: str, top_n: int = 3) -> pd.DataFrame:
+        """Retrieve top-N matching documents."""
+        if (
+            self.faiss_index is None
+            or self.chroma_collection is None
+            or self.doc_series is None
+        ):
+            raise RuntimeError(
+                "RAG not built or loaded — call build() or load() first."
+            )
+
+        q_emb = self.model.encode([query])
+        top_n = min(top_n, self.faiss_index.ntotal)
+        D, I = self.faiss_index.search(q_emb, top_n)
+        doc_ids = self.doc_series.index[I[0]].tolist()
+
+        return pd.DataFrame(
+            {
+                "doc_id": doc_ids,
+                "score": D[0],
+                "text": [self.doc_series.loc[i] for i in doc_ids],
+            }
+        )
+
+    # ============================================================
+    # ADD DOCUMENTS (SAFE UPDATE)
+    # ============================================================
+    def add_documents(self, new_docs: pd.Series, overwrite: bool):
+        """Add or update documents in the RAG stores."""
+        logging.debug("➕ Adding new documents...")
+
+        if self.doc_series is None:
+            raise RuntimeError("No doc_series loaded. Call build() or load() first.")
+
+        # --- Handle duplicates ---
+        existing_ids = set(self.doc_series.index)
+        new_ids = set(new_docs.index)
+        overlap = existing_ids.intersection(new_ids)
+
+        if overlap and not overwrite:
+            raise ValueError(
+                f"❌ Duplicate doc_ids found: {overlap}. "
+                f"Use overwrite=True to replace them."
+            )
+
+        if overlap:
+            logging.debug(f"⚠️ Overwriting existing doc_ids: {overlap}")
+            # Remove old entries from Chroma (safe if id doesn't exist)
+            for doc_id in overlap:
+                try:
+                    self.chroma_collection.delete(ids=[str(doc_id)])
+                except Exception:
+                    pass
+            # Drop from doc_series
+            self.doc_series = self.doc_series.drop(overlap)
+
+        # --- Add new / updated docs ---
+        new_embeddings = self._create_embeddings(new_docs.tolist())
+
+        # Combine with existing docs
+        all_docs = pd.concat([self.doc_series, new_docs])
+        all_embeddings = self._create_embeddings(all_docs.tolist())
+
+        # Rebuild FAISS index (safe and consistent)
+        self.faiss_index = self._build_faiss(all_embeddings)
+
+        # Update Chroma
+        self.chroma_collection.add(
+            documents=new_docs.tolist(),
+            embeddings=new_embeddings.tolist(),
+            ids=new_docs.index.astype(str).tolist(),
+        )
+
+        # Update and save doc store
+        self.doc_series = all_docs
+        self._save_doc_series()
+        self._check_integrity()
+        logging.debug("✅ Added/updated documents and rebuilt stores.\n")
+
+
+    # ============================================================
+    # DELETE DOCUMENT
+    # ============================================================
+    def delete_document(self, doc_id: str):
+        """
+        Delete a single document (by doc_id) from:
+            - doc_series
+            - Chroma collection
+            - FAISS index (rebuilt without the deleted doc)
+
+        After deletion all stores are rewritten consistently.
+
+        Parameters
+        ----------
+        doc_id : str
+            The ID of the document to remove.
+        """
+        if self.doc_series is None:
+            raise RuntimeError("No doc_series loaded. Call build() or load() first.")
+
+        doc_id = str(doc_id)
+
+        # --- Check existence ---
+        if doc_id not in self.doc_series.index:
+            logging.warning(f"⚠️ Document '{doc_id}' not found — nothing to delete.")
+            return
+
+        logging.debug(f"🗑️ Deleting document '{doc_id}' from RAG stores...")
+
+        # --- 1. Remove from Chroma ---
+        try:
+            self.chroma_collection.delete(ids=[doc_id])
+        except Exception as e:
+            logging.warning(f"⚠️ Could not delete '{doc_id}' from Chroma: {e}")
+
+        # --- 2. Remove from doc_series ---
+        self.doc_series = self.doc_series.drop(doc_id)
+
+        # --- 3. Rebuild FAISS from remaining documents ---
+        if len(self.doc_series) > 0:
+            new_embeddings = self._create_embeddings(self.doc_series.tolist())
+            self.faiss_index = self._build_faiss(new_embeddings)
+        else:
+            # No docs left → recreate empty FAISS index
+            dim = self.model.get_sentence_embedding_dimension()
+            self.faiss_index = faiss.IndexFlatL2(dim)
+            faiss.write_index(self.faiss_index, self.faiss_index_path)
+            logging.debug("🔄 FAISS index reset to empty.")
+
+        # --- 4. Persist updated documents ---
+        self._save_doc_series()
+
+        # --- 5. Re-check store consistency ---
+        self._check_integrity()
+        logging.debug(f"✅ Document '{doc_id}' deleted successfully.\n")
+
+# ============================================================
+# EXAMPLE USAGE
+# ============================================================
+if __name__ == "__main__":
+    from utils import BENCHMARKS_RAG, CHARACTERISTICS_RAG, JKP_RAG_PATH, CRSP_RAG_PATH
+    RAG_PATH = CRSP_RAG_PATH   # JKP_RAG_PATH
+
+    rag = RAG(CHARACTERISTICS_RAG, RAG_PATH).load()
+    while False:
+        query = input("Search phrase: ")
+        if not query:
+            break
+        print(rag.retrieve(query, top_n=20).to_string())
+
+    if True:  # delete
+        rag = RAG(CHARACTERISTICS_RAG, RAG_PATH).load()
+        #rag.delete_document("CAPVW")
+        #rag.delete_document("LOG1P_RET")
+        #rag.delete_document("VW_CAP")
+        #rag.delete_document("SIZE_DECILE")
+
+    if False:  # temp
+        name = "temp"
+        docs = pd.Series(
+            {"doc1": "The Eiffel Tower is in Paris.", "doc2": "The Colosseum is in Rome."}
+        )
+
+        rag = RAG(name)
+        rag.build(docs, force_rebuild=True)
+
+        # Add or update
+        new_docs = pd.Series(
+            {
+                "doc2": "The Colosseum is an ancient amphitheatre in Rome.",
+                "doc3": "Mount Fuji is a famous mountain in Japan.",
+            }
+        )
+        rag.add_documents(new_docs, overwrite=True)
+
+        # Retrieve
+        print(rag.retrieve("ancient amphitheatre in Rome"))

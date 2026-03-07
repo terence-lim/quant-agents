@@ -1,0 +1,105 @@
+# python performance_server.py
+from mcp.server.fastmcp import FastMCP
+from utils import MEDIA, markdown_to_pdf
+import traceback
+import json
+from qrafti import Panel, DATES
+from report_utils import write_report
+from server_utils import panel_or_numeric, str_or_None, bool_or_None, int_or_None, log_tool, now
+import logging
+logging.basicConfig(level=logging.INFO)
+
+
+# Create an MCP server
+port = 8001
+mcp = FastMCP("report-server", host="0.0.0.0", port=port)
+
+
+@mcp.tool()
+def Panel_standardized_report(panel_id: str, description: str = '') -> str:
+    """Returns prompt string, including computed summary tables, for generating a
+    report to evaluate a Panel containing stock characteristics for predicting stock returns.
+
+    Args:
+        panel_id (str): The id of the panel data set for factor characteristic values.
+        description (str): A full definition of the factor characteristic.
+    Returns:
+        str: prompt string containing summary tables in markdown text format
+    """
+
+    prompt_str = f"""
+You are a quantitative researcher asked to write a standardized report, following a specific protocol,
+to analyze a candidate financial characteristic for predicting stock returns: '{description}'.
+
+Please also provide a catchy title name for the characteristic, and
+follow these specific guidelines for writing the standardized research report:
+
+## Motivation (1 paragraph, ~100 words): 
+    * Broad statement on market efficiency or asset pricing. 
+    * Identify a gap in the current practice and literature.
+    * Use active voice and declarative statements.
+
+## Hypothesis Development (1 paragraph, ~150 words):
+    * Present economic mechanisms linking characteristic to returns.
+    * Draw on theoretical frameworks.
+    * Support claims with citations.
+
+## Results Summary (1-2 paragraphs, ~200 words):
+    * Lead with the strongest statistical finding.
+    * Summarize the key results in a narrative form, including economic significance.
+    * Do not merely cite numbers; interpret them.
+
+## Contribution (1 paragraph, ~150 words):
+    * Position relative to 3-4 related finance/accounting journal articles.
+    * Highlight methodological innovations.
+
+In your writing, please:
+
+* Use active voice (e.g., "We find").
+* Maintain clarity and conciseness.
+* Avoid jargon; explain technical terms.
+* Use present tense for established findings.
+* Use past tense for specific results.
+* Make clear distinctions between correlation and causation.
+* Avoid speculation beyond the data.
+
+Output in markdown format with 5 sections: Introduction, Hypothesis Development, Results, Contribution, Tables.
+The tables section reproduces the statistical tables data provided below.
+Base the Results section strictly on the statistical tables data, matching its terminology and precision:
+"""
+    
+    try:
+        panel = panel_or_numeric(panel_id, **DATES)
+        report_tables = write_report(panel)
+        report_prompt = "\n\n".join([prompt_str.strip(), report_tables.strip(), f"Report Created: {now()}"])
+
+        print(report_prompt)
+
+        out = dict(report_prompt=report_prompt)
+    except Exception as e:
+        out = dict(error=traceback.format_exc())
+    log_tool(tool="Panel_standardized_report", 
+             input=dict(panel_id=panel_id, description=description),
+             output=out if 'error' in out else dict(length=f"{len(report_tables)=}"))
+    return json.dumps(out)
+
+@mcp.tool()
+def Panel_save_report(text: str) -> str:
+    """Saves the markdown report text as a PDF.
+
+    Args:
+        text (str): The report text in markdown format to be saved as a PDF file.
+    Returns:
+        str: A message indicating the report has been saved and its length
+    """    
+    with open(MEDIA / "output.md", "w") as f:
+        f.write(text)
+    markdown_to_pdf(text, output_file  = MEDIA / "output.pdf")
+    out = dict(message="Report saved as output.md and output.pdf", length=f"{len(text)=}")
+    log_tool(tool="Panel_save_report", input=dict(text_length=len(text)), output=out)
+    return json.dumps(out)
+
+
+if __name__ == "__main__":
+    # Run with SSE transport
+    mcp.run(transport="streamable-http")
