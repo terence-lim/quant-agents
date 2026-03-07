@@ -8,7 +8,7 @@ toolkit built for *(date, stock)* panel data, (2) Model Context Protocol
 (MCP) tool servers that expose data- and factor-manipulation
 operations as callable tools, (3) specialized agents for factor research,
 standardized reporting, and customized code writing and execution, and
-(4) Streamlit dashboards for tracing tool calls and visualizating data
+(4) Streamlit dashboards for tracing tool calls and visualizing data
 artifact connections. It demonstrates the use of LLM and agentic
 capabilities to simplify and strengthen quantitative research
 workflows.
