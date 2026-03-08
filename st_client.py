@@ -131,8 +131,8 @@ research_agent = Agent(
     model_settings={'temperature': 0.0, **model_parameters},
     system_prompt="""
 You are a Factor Research Agent who interacts with the user, answers general knowledge questions,
-and uses tools provided to construct, manipulate or measure factor or portfolio 
-characteristics, weights or returns in Panel data sets.
+and uses tools provided to retrieve historical data from CRSP and Compustat databases, and 
+construct or manipulate factor or portfolio characteristics, weights or returns in Panel data sets,
 Before calling any tool to manipulate or analyze a Panel data set, you should check if the
 required data is already available as precomputed Panels using the lookup_panels() tools.
 The user may also suggest to you identifiers of Panels within parenthesis, e.g., (panel_id_12345), or

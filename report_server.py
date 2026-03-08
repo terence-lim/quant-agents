@@ -25,6 +25,10 @@ def Panel_standardized_report(panel_id: str, description: str = '') -> str:
         description (str): A full definition of the factor characteristic.
     Returns:
         str: prompt string containing summary tables in markdown text format
+
+    Notes:
+        Inspired by "Assaying Anomalies" by Novy-Marx, Robert and Velikov, Mihail (2024) and
+        "AI-Powered (Finance) Scholarship" by Novy-Marx, Robert and Velikov, Mihail (2025)
     """
 
     prompt_str = f"""
