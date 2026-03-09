@@ -17,9 +17,9 @@ strengthen quantitative research workflows.
 
 ## Example Prompts for Using QRAFTI
 
-Use the following prompts to illustrate how a user can work with QRAFTI for replication studies and autonomous factor research.
+The following prompts illustrate how a user can work with QRAFTI for replication studies and autonomous factor research (see [case studies in appendix](Appendix.pdf) for full chat transcripts and traces)
 
-### 1) Replicate HML-style workflow
+### 1) Replicate Fama-French HML-style workflow
 
 ```text
 Construct book equity as stockholder equity (seq) minus the book value of preferred stock,
@@ -43,6 +43,11 @@ Finally, create a scatter plot of the factor returns against its benchmark retur
 
 Compute the correlation between the factor returns and the benchmark
 ```
+
+<p align="center">
+  <img src="HML.png" width="48%" />
+  <img src="JKP.png" width="48%" />
+</p>
 
 ### 2) Replicate JKP-style price momentum factor workflow
 
@@ -85,14 +90,19 @@ Guidelines:
 Please execute the plan and provide a standardized research report.
 ```
 
+<p align="center">
+  <img src="qarp.png" width="48%" />
+  <img src="buffet.png" width="48%" />
+</p>
+
 ## Project Structure
 
-Python modules for running *multi-agent* quantitative research workflows, including data/factor services, user access interface, and empirical analysis tooling.
+Python modules for running *multi-agent* quantitative research workflows, including data/factor services, user access interface, and empirical analysis tooling (see [documentation in appendix](Appendix.pdf) for details).
 
 ### 1) Research Service Layer
 **Files:** `factor_server.py`, `coding_server.py`, `report_server.py`, `server_utils.py`, `research_utils.py`, `report_utils.py`
 
-Provides the service-side components for exposing factor computations, custom tool coding, and report generation capabilities. Shared server helpers and common logic live in `server_utils.py`, `research_utils.py` and `report_utils.py`, while the MCP server entry points are separated by specialization (`factor_server.py`, `coding_server.py` and `report_server.py`).
+Provides the service-side components for exposing factor computations, custom tool coding, and report generation capabilities. Server helpers and shared common logic live in `server_utils.py`, `research_utils.py` and `report_utils.py`, while the MCP server entry points are separated by specialization (`factor_server.py`, `coding_server.py` and `report_server.py`).
 
 ### 2) Client Access Layer
 **Files:** `st_client.py`, `client_utils.py`
