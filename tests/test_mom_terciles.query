@@ -1,0 +1,8 @@
+Define price momentum characteristic as stocks' past 12 months returns skipping one month.
+Sort stocks into characteristic terciles (top/middle/bottom third) with breakpoints 
+based on non-micro stocks, where micro stocks are all stocks whose market capitalization 
+is below the NYSE 20th percentile.
+
+
+Return only the panel_id of the final constructed panel, with no additional text. 
+If the request cannot be completed because of an error, return exactly `MODEL ERROR`.

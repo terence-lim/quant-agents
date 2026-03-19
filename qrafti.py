@@ -24,16 +24,11 @@ DATE_NAME = "eom"
 #
 # These are temporarily here, perhaps should be in utils.py...
 #
-#DATES = dict(start_date="2020-01-01", end_date="2024-12-31")
+DATES = dict(start_date="2020-01-01", end_date="2024-12-31")
 #DATES = dict(start_date="2001-01-01", end_date="2024-12-31")
-DATES = dict(start_date="1993-01-01", end_date="2024-12-31")
+#DATES = dict(start_date="1993-01-01", end_date="2024-12-31")
 
-CRSP_VERSION = True
-if CRSP_VERSION:
-    RAG_PATH = CRSP_RAG_PATH
-else:
-    RAG_PATH = JKP_RAG_PATH
-
+RAG_PATH = CRSP_RAG_PATH  ### JKP_RAG_PATH
 
 ###########################
 #
@@ -119,6 +114,7 @@ class Panel:
 
     def as_payload(self) -> dict:
         """Returns the persisted name of this Panel, and number of index levels and rows as a dict"""
+        self.save()
         return {"results_panel_id": self.name,
                 "nlevels": self.nlevels,
                 "rows": len(self)}

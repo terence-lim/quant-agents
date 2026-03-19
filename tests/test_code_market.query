@@ -1,0 +1,18 @@
+
+You may only use the coding_agent_tool and the Panel_lookup tools;
+do not use any other tools to respond to the following query:
+
+Construct book equity as stockholder equity (seq) minus the book value of preferred stock, 
+where preferred stock is defined as the redemption (pstkrv), liquidation (pstkl), 
+or par value (pstk), if available, in that order.
+Construct book equity as stockholder equity (seq) minus the book value of preferred stock, 
+where preferred stock is defined as the redemption (pstkrv), liquidation (pstkl), 
+or par value (pstk), if available, in that order.
+
+Each December, divide book equity of a firm’s fiscal year-end at or before December 
+by the company market capitalization (CAPCO) at the end of the year. 
+Then construct book-to-market equity in June as the lagged values from the previous December.
+
+
+Respond with only the panel_id of the final panel constructed without any other text;
+if you cannot complete the request due to errors, then respond with 'MODEL ERROR'.

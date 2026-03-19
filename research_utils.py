@@ -1,4 +1,4 @@
-from qrafti import Panel, DATE_NAME, STOCK_NAME, CRSP_VERSION
+from qrafti import Panel, DATE_NAME, STOCK_NAME
 from utils import Calendar
 import json
 import pandas as pd
@@ -350,10 +350,7 @@ def portfolio_impute(port_weights: Panel, normalize: bool = True, drifted: bool 
     assert port_weights.nlevels == 2, "Portfolio weights must have two index levels"
     # should be ending dates of observed return, to align with dates of weights after drifting
     dates = dict(start_date=None, end_date=None)
-    if CRSP_VERSION:
-        retx = Panel().load("RETX", **dates)
-    else:
-        retx = Panel().load("ret_exc_lead1m", **dates).shift(1)
+    retx = Panel().load("RETX", **dates)  ### Panel().load("ret_exc_lead1m", **dates).shift(1)
     portfolio_dates = port_weights.dates
     cal = Calendar(start_date=portfolio_dates[0], end_date=portfolio_dates[-1])
     all_dates = cal.dates_range(cal.start_date, cal.end_date)
@@ -429,9 +426,6 @@ def portfolio_returns(port_weights: "Panel") -> "Panel":
     """
     # should be leading dates, to compute returns realized in the month ahead
     dates = dict(start_date=None, end_date=None)
-    if CRSP_VERSION:
-        stock_returns = Panel().load("EXCRET", **dates).shift(-1)
-    else:
-        stock_returns = Panel().load("ret_exc_lead1m", **dates)
+    stock_returns = Panel().load("EXCRET", **dates).shift(-1)  ### Panel().load("ret_exc_lead1m", **dates)
     port_weights = portfolio_impute(port_weights, normalize=True)
     return (port_weights @ stock_returns).shift(1)

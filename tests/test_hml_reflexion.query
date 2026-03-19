@@ -1,0 +1,43 @@
+
+Use a Reflexion-style planning workflow for the query below.
+
+Phase 1 — Initial plan
+Read the entire query carefully and draft a step-by-step plan for completing it.
+The plan should be explicit, ordered, and scoped to the full task.
+Use your given tools, except the coding_agent tool, and panel data sets.
+
+Phase 2 — Reflection and self-critique
+Review the draft plan and evaluate it for completeness, feasibility, and efficiency. Check whether each step:
+- can be carried out with the available tools, information, and constraints,
+- meaningfully contributes to the objective,
+- appears in the right order, and
+- avoids unnecessary work or hidden assumptions.
+
+Phase 3 — Revised plan
+Revise the plan to address the issues found during reflection, and execute it.
+
+Query:
+Construct book equity as stockholder equity (seq) minus the book value of preferred stock, 
+where preferred stock is defined as the redemption (pstkrv), liquidation (pstkl), 
+or par value (pstk), if available, in that order.
+Construct book equity as stockholder equity (seq) minus the book value of preferred stock, 
+where preferred stock is defined as the redemption (pstkrv), liquidation (pstkl), 
+or par value (pstk), if available, in that order.
+
+Each December, divide book equity of a firm’s fiscal year-end at or before December 
+by the company market capitalization (CAPCO) at the end of the year. 
+Then construct book-to-market equity in June as the lagged values from the previous December.
+Sort stocks independently on market equity (CAP) into small and big stocks using 
+the median market capitalization of all stocks traded on the NYSE as breakpoints, 
+and on book-to-market equity into growth, neutral, and value stocks using the 30th and 70th 
+percentiles of book-to-market equity of all stocks traded on the NYSE as breakpoints.
+
+Form portfolios as the intersection of these sorts, 
+where the portfolios are weighted by market equity (CAP).
+
+Construct the HML factor portfolio as the average of a small and a big value portfolio minus 
+the average of a small and a big growth portfolio in each month. 
+
+
+Respond with only the panel_id of the final panel constructed without any other text;
+if you cannot complete the request due to errors, then respond with 'MODEL ERROR'.

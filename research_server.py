@@ -98,7 +98,7 @@ def Panel_binary_op(
                 f"Unsupported op={op!r}. Must be one of {sorted(ops.keys())}."
             )
 
-        p3 = Panel(ops[op](p1, p2)).save()
+        p3 = Panel(ops[op](p1, p2))
         out = p3.as_payload()
     except Exception:
         out = dict(error=traceback.format_exc())
@@ -148,28 +148,28 @@ def Panel_unary_op(
         p1 = panel_or_numeric(panel_id, **DATES)
 
         if op == "neg":
-            p3 = Panel(-p1).save()
+            p3 = Panel(-p1)
 
         elif op == "not":
-            p3 = Panel((not p1) if is_scalar(p1) else (~p1)).save()
+            p3 = Panel((not p1) if is_scalar(p1) else (~p1))
 
         elif op == "log":
-            p3 = p1.log().save()
+            p3 = p1.log()
 
         elif op == "exp":
-            p3 = p1.exp().save()
+            p3 = p1.exp()
 
         elif op == "log1p":
-            p3 = p1.log1p().save()
+            p3 = p1.log1p()
 
         elif op == "expm1":
-            p3 = p1.expm1().save()
+            p3 = p1.expm1()
 
         elif op == "abs":
-            p3 = p1.abs().save()
+            p3 = p1.abs()
 
         elif op == "int":
-            p3 = p1.int().save()
+            p3 = p1.int()
 
         else:
             raise ValueError(
@@ -202,7 +202,7 @@ def Panel_isin(panel_id: str | int | float, values: List[int]) -> str:
     """
     try:
         p1 = panel_or_numeric(panel_id, **DATES)
-        p2 = p1.apply(lambda df: df.isin(values)).save()
+        p2 = p1.apply(lambda df: df.isin(values))
         out = p2.as_payload()
     except Exception as e:
         out = dict(error=traceback.format_exc())
@@ -229,7 +229,7 @@ def Panel_restrict(panel_id: str, mask_panel_id: Optional[str] = None,
         mask_panel = panel_or_numeric(mask_panel_id, **DATES)
         subset_panel = panel_or_numeric(subset_panel_id, **DATES)
         kwargs = dict(min_value=1e-6) if bool_or_None(positive) else {}
-        p2 = p1.restrict(mask=mask_panel, subset=subset_panel, **kwargs).save()
+        p2 = p1.restrict(mask=mask_panel, subset=subset_panel, **kwargs)
         out = p2.as_payload()
     except Exception as e:
         out = dict(error=traceback.format_exc())
@@ -271,7 +271,7 @@ def Panel_lag(panel_id: str, months: int = 1) -> str:
     try:
         p1 = panel_or_numeric(panel_id, **DATES)
         months = int_or_None(months)
-        p2 = p1.shift(shift=months).save()
+        p2 = p1.shift(shift=months)
         out = p2.as_payload()
     except Exception as e:
         out = dict(error=traceback.format_exc())
@@ -335,7 +335,7 @@ def Panel_standardize(panel_id: str, reference_panel_id: str = '') -> str:
     try:
         p1 = panel_or_numeric(panel_id, **DATES)
         p2 = panel_or_numeric(reference_panel_id, **DATES)
-        p3 = p1.apply(standardize, 1 if p2 is None else p2).save()  # if p2 is None, then use all
+        p3 = p1.apply(standardize, 1 if p2 is None else p2)  # if p2 is None, then use all
         out = p3.as_payload()
     except Exception as e:
         out = dict(error=traceback.format_exc())
@@ -361,7 +361,7 @@ def Panel_winsorize(panel_id: str, reference_panel_id: str = '', lower: float = 
     try:
         p1 = panel_or_numeric(panel_id, **DATES)
         p2 = panel_or_numeric(reference_panel_id, **DATES)
-        p3 = p1.apply(winsorize, 1 if p2 is None else p2, lower=lower, upper=upper).save() 
+        p3 = p1.apply(winsorize, 1 if p2 is None else p2, lower=lower, upper=upper)
         out = p3.as_payload()
     except Exception as e:
         out = dict(error=traceback.format_exc())
@@ -406,7 +406,7 @@ def Panel_quantiles(panel_id: str, cuts: int | list[float], reference_panel_id: 
     try:
         p1 = panel_or_numeric(panel_id, **DATES)
         p2 = panel_or_numeric(reference_panel_id, **DATES)
-        p3 = p1.apply(digitize, 1 if p2 is None else p2, cuts=cuts, ascending=ascending).save()
+        p3 = p1.apply(digitize, 1 if p2 is None else p2, cuts=cuts, ascending=ascending)
         out = p3.as_payload()
     except Exception as e:
         out = dict(error=traceback.format_exc())
@@ -426,7 +426,7 @@ def Panel_characteristics_coalesce(panel_ids: List[str]) -> str:
     """
     try:
         panels = [panel_or_numeric(pid, **DATES) for pid in panel_ids]
-        filled = characteristics_coalesce(*panels, replace=[0]).save()
+        filled = characteristics_coalesce(*panels, replace=[0])
         out = filled.as_payload()
     except Exception as e:
         out = dict(error=traceback.format_exc())
@@ -483,7 +483,7 @@ def Panel_characteristics_resample(
     """
     try:
         characteristics = panel_or_numeric(panel_id, **DATES)
-        samples = characteristics_resample(characteristics, ffill=ffill, month=month).save()
+        samples = characteristics_resample(characteristics, ffill=ffill, month=month)
         out = samples.as_payload()
     except Exception as e:
         out = dict(error=traceback.format_exc())
@@ -527,9 +527,9 @@ def Panel_annual_change(panel_id: str, op: str = "pct", quarterly: bool = False)
         func = pd.DataFrame.pct_change if op == "pct" else pd.DataFrame.diff
 
         if quarterly:
-            p2 = p1.trend(func, interval=3, periods=4).save()
+            p2 = p1.trend(func, interval=3, periods=4)
         else:
-            p2 = p1.trend(func, interval=12, periods=1).save()
+            p2 = p1.trend(func, interval=12, periods=1)
 
         out = p2.as_payload()
     except Exception:
@@ -541,29 +541,6 @@ def Panel_annual_change(panel_id: str, op: str = "pct", quarterly: bool = False)
         output=out,
     )
     return json.dumps(out)
-
-@mcp.tool()
-def Panel_regression_residuals(panel_id: str, other_panel_ids: List[str]) -> str:
-    """Computes residuals from a time series regression of stock returns in the given panel on other benchmark time series
-
-    Args:
-        panel_id (str): Identifier for the source characteristic panel to compute regression residuals.
-        other_panel_ids (List[str]): Identifiers for the benchmark series to regress on
-    Returns:
-        JSON string containing the identifier of the persisted panel of regression residuals.
-    """
-    try:
-        p1 = panel_or_numeric(panel_id, **DATES)
-        other_panels = [panel_or_numeric(pid, **DATES) for pid in other_panel_ids]
-        p2 = p1.trend(regression_residuals, other_panels).save()
-        out = p2.as_payload()
-    except Exception as e:
-        out = dict(error=traceback.format_exc())
-    log_tool(tool="Panel_regression_residuals",
-             input=dict(panel_id=panel_id, other_panel_ids=other_panel_ids),
-             output=out)    
-    return json.dumps(out)
-
 
 @mcp.tool()
 def Panel_rolling(panel_id: str, window: int, skip: int = 0, agg: str = "sum", interval: int = 1) -> str:
@@ -593,7 +570,7 @@ def Panel_rolling(panel_id: str, window: int, skip: int = 0, agg: str = "sum", i
     try:
         p1 = panel_or_numeric(panel_id, **DATES)
         p2 = p1.trend(rolling, window=window, skip=skip, agg=agg, interval=interval)
-        p3 = p2.save()
+        p3 = p2
         out = p3.as_payload()
     except Exception as e:
         out = dict(error=traceback.format_exc())
@@ -628,7 +605,7 @@ def Panel_rolling(panel_id: str, window: int, skip: int = 0, agg: str = "sum", i
 #     try:
 #         p1 = Panel().load('RET', **DATES).log1p()
 #         p2 = p1.trend(rolling, window=window, skip=skip, agg="sum", interval=interval).expm1()
-#         p3 = p2.save()
+#         p3 = p2
 #         out = p3.as_payload()
 #     except Exception as e:
 #         out = dict(error=traceback.format_exc())
@@ -666,7 +643,7 @@ def Panel_portfolio_returns(panel_id: str) -> str:
     """ 
     try:
         p_weights = Panel().load(str_or_None(panel_id), **DATES)
-        p_returns = portfolio_returns(p_weights).save()
+        p_returns = portfolio_returns(p_weights)
         out = p_returns.as_payload()
     except Exception as e:
         out = dict(error=traceback.format_exc())
@@ -700,7 +677,7 @@ def Panel_portfolio_weights(panel_id: str, other_panel_id: str = None) -> str:
     try:
         p1 = panel_or_numeric(panel_id, **DATES)
         p2 = panel_or_numeric(other_panel_id, **DATES)
-        p3 = p2.apply(portfolio_weights, p1, fill_value=0).save()
+        p3 = p2.apply(portfolio_weights, p1, fill_value=0)
         out = p3.as_payload()
     except Exception as e:
         out = dict(error=traceback.format_exc())

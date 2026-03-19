@@ -105,9 +105,14 @@ Python modules for running *multi-agent* quantitative research workflows, includ
 Provides the service-side components for exposing factor computations, custom tool coding, and report generation capabilities. Server helpers and shared common logic live in `server_utils.py`, `research_utils.py` and `report_utils.py`, while the MCP server entry points are separated by specialization (`factor_server.py`, `coding_server.py` and `report_server.py`).
 
 ### 2) Client Access Layer
-**Files:** `st_client.py`, `client_utils.py`
+**Files:** `st_client.py`, `shared_agents.py`, `agent_delegation.py`, `agent_cli.py`, `client_utils.py`
 
-Contains the client-side interface used to connect to and interact with the service layer. `client_utils.py` centralizes reusable client helpers, while `st_client.py` serves as the primary client implementation in Pydantic-AI and Streamlit.
+Contains client-side interfaces and shared agent composition utilities.
+- `shared_agents.py` defines reusable model + agent factories used by multiple apps.
+- `agent_delegation.py` defines reusable delegation tool wiring (`report_agent_tool`, `coding_agent_tool`) that can be attached to the research agent in any runtime.
+- `st_client.py` remains the Streamlit UI entrypoint and imports the shared factories.
+- `agent_cli.py` is a standalone Python CLI example showing how to use the same agents outside Streamlit.
+- `client_utils.py` centralizes reusable client helpers.
 
 ### 3) Financial Intelligence Toolkit
 **Files:** `qrafti.py`, `utils.py`, `portfolio.py`, `rag.py`, `reboot.py`
@@ -122,3 +127,10 @@ CRSP, Compustat
 ![Agentic Framework](architecture.png)
 
 
+
+## Running the reusable clients
+
+- Streamlit UI: `streamlit run st_client.py --server.fileWatcherType="poll"`
+- Standalone CLI: `python agent_cli.py`
+
+Both entry points reuse the same agent definitions from `shared_agents.py`.

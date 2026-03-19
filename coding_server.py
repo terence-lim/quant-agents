@@ -22,6 +22,7 @@ def execute_python(code_str: str) -> str:
         str: The standard output from the executed code, preferably in JSON format.
     """
     log_code(code_str)
+    print(code_str)
     stdout, stderr, exit_code = run_code_in_subprocess(code_str)
     if exit_code:
         return json.dumps({"exit_code": exit_code, "error_message": stderr.strip()})

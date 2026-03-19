@@ -1,0 +1,32 @@
+
+Use a Reflexion-style planning workflow for the query below.
+
+Phase 1 — Initial plan
+Read the entire query carefully and draft a step-by-step plan for completing it.
+The plan should be explicit, ordered, and scoped to the full task.
+Use your given tools, except the coding_agent tool, and panel data sets.
+
+Phase 2 — Reflection and self-critique
+Review the draft plan and evaluate it for completeness, feasibility, and efficiency. Check whether each step:
+- can be carried out with the available tools, information, and constraints,
+- meaningfully contributes to the objective,
+- appears in the right order, and
+- avoids unnecessary work or hidden assumptions.
+
+Phase 3 — Revised plan
+Revise the plan to address the issues found during reflection, and execute it.
+
+Query:
+Define price momentum characteristic as stocks' past 12 months returns skipping one month.
+Sort stocks into characteristic terciles (top/middle/bottom third) with breakpoints 
+based on non-micro stocks, where micro stocks are all stocks whose market capitalization 
+is below the NYSE 20th percentile.
+For each tercile, compute its "capped value" weighted portfolio, meaning that we weight stocks 
+by their market equity winsorized at the NYSE 80th percentile.
+
+The factor returns are then defined as the top-tercile portfolio return minus 
+the bottom-tercile portfolio return.
+
+
+Return only the panel_id of the final constructed panel, with no additional text. 
+If the request cannot be completed because of an error, return exactly `MODEL ERROR`.
