@@ -1,25 +1,21 @@
-# python research_server.py
+# python research_server.py  
+# (c) Terence Lim
 from mcp.server.fastmcp import FastMCP
 import json
 import pandas as pd
 from pandas.api.types import is_scalar
-from typing import Any, List, Optional, Dict, Callable
-from datetime import datetime
-from pathlib import Path
-import matplotlib.pyplot as plt
+from typing import List, Optional
 import traceback
 import warnings
 import logging
 
-from utils import plt_savefig, BENCHMARKS_RAG, CHARACTERISTICS_RAG
+from qrafti import Panel, DATES
+from rag import RAG
 from research_utils import (winsorize, standardize, digitize, characteristics_coalesce, characteristics_resample,
                             portfolio_weights, portfolio_returns, rolling, regression_residuals)
 from server_utils import panel_or_numeric, str_or_None, bool_or_None, int_or_None, log_tool, query_rag
-from rag import RAG
-from qrafti import Panel, DATES
-
-# Temporarily in qrafti
-from qrafti import RAG_PATH
+from utils import plt_savefig, BENCHMARKS_RAG, CHARACTERISTICS_RAG, JKP_RAG_PATH, CRSP_RAG_PATH
+RAG_PATH = CRSP_RAG_PATH  # JKP_RAG_PATH
 
 logging.basicConfig(level=logging.DEBUG)
 warnings.simplefilter(action="ignore", category=FutureWarning)
@@ -27,8 +23,6 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 char_rag = RAG(CHARACTERISTICS_RAG, out_dir=RAG_PATH).load()
 bench_rag = RAG(BENCHMARKS_RAG, out_dir=RAG_PATH).load()
 
-
-# Create an MCP server
 port = 8000
 mcp = FastMCP("research-server", host="0.0.0.0", port=port)
 
@@ -578,42 +572,6 @@ def Panel_rolling(panel_id: str, window: int, skip: int = 0, agg: str = "sum", i
              input=dict(panel_id=panel_id, window=window, skip=skip, agg=agg, interval=interval),
              output=out)    
     return json.dumps(out)
-
-# @mcp.tool()
-# def Panel_price_momentum(window: int, skip: int = 0, interval: int = 1) -> str:
-#     """
-#     Computes cumulative stock price changes over a specified rolling lookback period. 
-#     This tool is ideal for capturing 'momentum' or 'trend' factors in cross-sectional stock analysis.
-
-#     Use this tool when prompted to calculate sums of returns over a specific timeframe, 
-#     optionally excluding the most recent period to account for short-term reversals.
-
-#     Args:
-#         window (int): The total number of periods to include in the return calculation. 
-#            Example: For "past 12 months", window=12.
-#         skip (int): The number of most recent periods to exclude (ignore) from the calculation. 
-#            Example: For "skipping one month", skip=1. Defaults to 0.
-#         interval (int): The duration of each period in months. 
-#            - 1: Monthly (default)
-#            - 3: Quarterly
-#            - 12: Yearly
-#            Example: To compute "past 12 months returns skipping one month", set window=12, skip=1, and interval=1.
-
-#     Returns:
-#         JSON string containing the identifier of the persisted panel of stock price momentum characteristics.
-#     """
-#     try:
-#         p1 = Panel().load('RET', **DATES).log1p()
-#         p2 = p1.trend(rolling, window=window, skip=skip, agg="sum", interval=interval).expm1()
-#         p3 = p2
-#         out = p3.as_payload()
-#     except Exception as e:
-#         out = dict(error=traceback.format_exc())
-#     log_tool(tool="Panel_price_momentum",
-#              input=dict(window=window, skip=skip, interval=interval),
-#              output=out)    
-#     return json.dumps(out)
-
 
 @mcp.tool()
 def Panel_portfolio_returns(panel_id: str) -> str:

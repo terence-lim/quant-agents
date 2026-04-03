@@ -59,6 +59,34 @@ Revise the plan to address the issues found during reflection, and execute it.
 Query:
 """ + q3
 
+q3a = """
+Use a Reflexion-style planning workflow for the query below.
+
+Phase 1: Suggest a sequential order of steps using your given tools, except the coding_agent tool, and panel data to construct the factor.
+
+Phase 2: Check that each step is implementable with available tools and that the steps can efficiently satisfy the query.
+
+Phase 3: Rewrite the plan, and execute the corrected plan.
+
+Query:
+""" + q3
+
+q3a = """
+Use a Reflexion-style planning workflow for the query below.
+
+Phase 1 — Initial plan:
+Read the entire query carefully and draft a step-by-step plan for completing it. 
+Use your given tools, except the coding_agent tool, and panel data sets.
+
+Phase 2 — Reflection and self-critique:
+Review the draft plan and evaluate it for completeness, feasibility, and efficiency. 
+Check whether each step can be carried out with the available tools and constraints.
+
+Phase 3 — Revised plan:
+Revise the plan to address the issues found during reflection, and execute it.
+
+Query:
+""" + q3
 
 query_end = """
 Return only the panel_id of the final constructed panel, with no additional text. 
@@ -78,8 +106,7 @@ for panel, prompt in zip(out_panels, [q1, q1a, q2, q2a, q3, q3a]):
     print("python agent_cli.py " + query_name)
     print("python evaluate_agent.py " + query_name)    
 
-raise Exception
-    
+
 dates = DATES
 years = Panel().load('YEARS', **dates)
 bench_id = 'HML'
@@ -105,7 +132,13 @@ company_value = characteristics_resample(company_value, ffill=True, month=[month
 lags = 6
 book_market = (book_samples / company_value).shift(lags).save(next(panels) + '_')
 book_market.save(next(panels) + '_')
-    
+
+
+hml = Panel().load("HML")
+hml.save(next(panels) + '_')
+hml.save(next(panels) + '_')
+
+"""
 # Form size and bm quantiles based on NYSE stocks
 nyse = Panel().load("EXCHCD", **dates) == 1
 book_quantiles = book_market.apply(digitize, reference=nyse, cuts=[0.3, 0.7])
@@ -129,3 +162,4 @@ composite_returns.save(next(panels) + '_')
 
 # print(out_panels)
 
+"""

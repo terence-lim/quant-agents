@@ -1,6 +1,6 @@
+# server_utils.py    (c) Terence Lim
 import json
 from datetime import datetime
-import pandas as pd
 import sys
 import os
 import subprocess
@@ -87,8 +87,7 @@ def panel_or_numeric(x: str, **kwargs) -> Union["Panel", float, int]:
         panel = Panel().load(x, start_date=start_date, end_date=end_date)
         return panel
 
-
-# TO DO: All date and vulnerable str arguments for Panel methods should be converted using str_or_None
+# All date and vulnerable str arguments for Panel methods should be converted using str_or_None
 def str_or_None(x: str) -> Union[str, None]:
     """Convert a string to None if it is 'None' or empty."""
     if x is None or str(x).lower() in ["", "none"]:
@@ -139,8 +138,6 @@ def int_or_None(x: str) -> Union[float, None]:
 def run_code_in_subprocess(code_str):
     #with open("coding.log", "w") as f:
     #    f.write(f"RUN CODE IN SUBPROCESS: {code_str}\n")
-    #    f.flush()
-
     env = os.environ.copy()
     
     # prepend your project root to PYTHONPATH
@@ -152,62 +149,61 @@ def run_code_in_subprocess(code_str):
     print(f"Subprocess exited with code {proc.returncode}")
     return proc.stdout, proc.stderr, proc.returncode
 
-if False:
-#if __name__ == "__main__":
+
+if __name__ == "__main__":
     tic = time.time()
 
-    if True:  # Unit Test 1
-        test_str = """
-    panel_id = 'me' 
-    from qrafti import Panel
-    import pandas as pd
-    p1 = Panel().load(f'{panel_id}') 
-    p2 = Panel().load('crsp_exchcd').apply(pd.DataFrame.isin, values=[1, '1'])
-    def winsorize(x, lower=0.0, upper=1.0) -> pd.Series: 
-        lower, upper = x.loc[x.iloc[:, 1].astype(bool)].iloc[:, 0].quantile([lower, upper]).values
-        return x.iloc[:, 0].clip(lower=lower, upper=upper)
+    # Test 1
+    test_str = """
+panel_id = 'me' 
+from qrafti import Panel
+import pandas as pd
+p1 = Panel().load(f'{panel_id}') 
+p2 = Panel().load('crsp_exchcd').apply(pd.DataFrame.isin, values=[1, '1'])
+def winsorize(x, lower=0.0, upper=1.0) -> pd.Series: 
+    lower, upper = x.loc[x.iloc[:, 1].astype(bool)].iloc[:, 0].quantile([lower, upper]).values
+    return x.iloc[:, 0].clip(lower=lower, upper=upper)
+p3 = p1.apply(winsorize, 1 if p2 is None else p2, lower=0, upper=0.8).persist()
+print(p3.to_json())  # returns saved name of the panel as JSON string
+""".strip()
+    stdout, stderr, exit_code = run_code_in_subprocess(test_str)
+    print(exit_code)
+    print(stderr)
+    print(stdout)
 
-    p3 = p1.apply(winsorize, 1 if p2 is None else p2, lower=0, upper=0.8).persist()
-    print(p3.to_json())  # returns saved name of the panel as JSON string
-    """.strip()
-        stdout, stderr, exit_code = run_code_in_subprocess(test_str)
-        print(exit_code)
-        print(stderr)
-        print(stdout)
 
+    # Test 2
+    panel_id = "me"
+    other_panel_id = "ret_exc_lead1m"
+    code = f"""
+import json
+from qrafti import Panel
+p1, p2 = Panel().load('{panel_id}'), Panel().load('{other_panel_id}')
+p3 = (p1 @ p2).persist()
+print(p3.to_json())  # returns saved name of the panel as JSON string
+""".strip()
+    stdout, stderr, exit_code = run_code_in_subprocess(code)
+    print(exit_code)
+    print(stderr)
+    print(stdout)
 
-    if True:  # Unit Test 2
-        panel_id = "me"
-        other_panel_id = "ret_exc_lead1m"
-        code = f"""
-    import json
-    from qrafti import Panel
-    p1, p2 = Panel().load('{panel_id}'), Panel().load('{other_panel_id}')
-    p3 = (p1 @ p2).persist()
-    print(p3.to_json())  # returns saved name of the panel as JSON string
-    """.strip()
-        stdout, stderr, exit_code = run_code_in_subprocess(code)
-        print(exit_code)
-        print(stderr)
-        print(stdout)
-
-    if True:   # Unit Test 3
-        code = """
-    # Please run this following code:
-    from qrafti import Panel, MEDIA
-    import matplotlib.pyplot as plt
-    ret = 'ret_vw_cap'
-    factor = 'ret_12_1'
-    bench = Panel().load(factor + '_' + ret).frame
-    bench.cumsum().plot()
-    savefig = MEDIA / f"{factor}_{ret}.png"
-    plt.savefig(savefig)
-    print(f"[Image File](file:///{str(savefig)})")
-    """.strip()
-        stdout, stderr, exit_code = run_code_in_subprocess(code)
-        print(exit_code)
-        print(stderr)
-        print(stdout)
+    # Test 3
+    code = """
+# Please run this following code:
+from qrafti import Panel, MEDIA
+import matplotlib.pyplot as plt
+ret = 'ret_vw_cap'
+factor = 'ret_12_1'
+bench = Panel().load(factor + '_' + ret).frame
+bench.cumsum().plot()
+savefig = MEDIA / f"{factor}_{ret}.png"
+plt.savefig(savefig)
+print(f"[Image File](file:///{str(savefig)})")
+""".strip()
+    stdout, stderr, exit_code = run_code_in_subprocess(code)
+    print(exit_code)
+    print(stderr)
+    print(stdout)
 
 
     toc = time.time()

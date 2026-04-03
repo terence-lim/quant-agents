@@ -1,5 +1,4 @@
 # search_logs.py
-# TO DO: add optional list of input_args keys to include in graph nodes, e.g. "month", "cuts" 
 import json
 import os
 from typing import Dict, Any, List, Set, Tuple
@@ -454,14 +453,6 @@ def generate_graphviz(objects: Dict[str, dict], start_node: str = None) -> str:
                     f'    "{safe_src}" -> "{safe_dst}" '
                     f'[dir=back, color="blue", fontcolor="blue", label="{safe_field}"];'
                 )
-            # # Label only if field name != "panel_id"
-            # if field_name == "panel_id":
-            #     lines.append(f'    "{safe_src}" -> "{safe_dst}" [dir=back];')
-            # else:
-            #     safe_field = html.escape(field_name)
-            #     lines.append(
-            #         f'    "{safe_src}" -> "{safe_dst}" [label="{safe_field}" dir=back];'
-            #     )
 
     lines.append("}")
     return "\n".join(lines)
@@ -472,7 +463,6 @@ def generate_dot(objects, start_key):
     path = traverse_links(objects, start_key)
     # print("".join(path[::-1]))  # Print in visit order
 
-    #dot = generate_graphviz(objects)
     dot = generate_graphviz(objects, start_node=start_key)
     with open(OUTPUT / "subgraph.dot", "w") as f:
         f.write(dot)

@@ -1,4 +1,5 @@
-# python performance_server.py
+# python performance_server.py   
+# (c) Terence Lim
 from mcp.server.fastmcp import FastMCP
 from utils import MEDIA, markdown_to_pdf
 import traceback
@@ -9,12 +10,12 @@ from server_utils import panel_or_numeric, str_or_None, bool_or_None, int_or_Non
 import logging
 logging.basicConfig(level=logging.INFO)
 
-
 # Create an MCP server
 port = 8001
 mcp = FastMCP("report-server", host="0.0.0.0", port=port)
 
-
+# In the spirit of "Assaying Anomalies" by Novy-Marx, Robert and Velikov, Mihail (2024) and
+# "AI-Powered (Finance) Scholarship" by Novy-Marx, Robert and Velikov, Mihail (2025)
 @mcp.tool()
 def Panel_standardized_report(panel_id: str, description: str = '') -> str:
     """Returns prompt string, including computed summary tables, for generating a
@@ -25,10 +26,6 @@ def Panel_standardized_report(panel_id: str, description: str = '') -> str:
         description (str): A full definition of the factor characteristic.
     Returns:
         str: prompt string containing summary tables in markdown text format
-
-    Notes:
-        Inspired by "Assaying Anomalies" by Novy-Marx, Robert and Velikov, Mihail (2024) and
-        "AI-Powered (Finance) Scholarship" by Novy-Marx, Robert and Velikov, Mihail (2025)
     """
 
     prompt_str = f"""
@@ -71,7 +68,6 @@ Output in markdown format with 5 sections: Introduction, Hypothesis Development,
 The tables section reproduces the statistical tables data provided below.
 Base the Results section strictly on the statistical tables data, matching its terminology and precision:
 """
-    
     try:
         panel = panel_or_numeric(panel_id, **DATES)
         report_tables = write_report(panel)

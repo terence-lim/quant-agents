@@ -10,12 +10,3 @@ python agent_cli.py test_mom_returns
 python evaluate_agent.py test_mom_returns
 python agent_cli.py test_mom_reflexion
 python evaluate_agent.py test_mom_reflexion
-
-
-
-python evaluate_agent.py test_price_momentum
-python evaluate_agent.py test_code_momentum
-python evaluate_agent.py test_mom_terciles
-python evaluate_agent.py test_code_terciles
-python evaluate_agent.py test_mom_returns
-python evaluate_agent.py test_mom_reflexion

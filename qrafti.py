@@ -1,11 +1,8 @@
 # qrafti.py  (c) Terence Lim
 
-from utils import DataCache, Calendar, CRSP_RAG_PATH, JKP_RAG_PATH
-import matplotlib.pyplot as plt
+from utils import DataCache, Calendar
 import pandas as pd
 import numpy as np
-from pathlib import Path
-from tqdm import tqdm
 import json
 from typing import List, Dict, Union, Set, Any, Tuple, Callable
 from datetime import datetime
@@ -21,14 +18,10 @@ logging.disable(logging.DEBUG)
 STOCK_NAME = "permno"
 DATE_NAME = "eom"
 
-#
-# These are temporarily here, perhaps should be in utils.py...
-#
-DATES = dict(start_date="2020-01-01", end_date="2024-12-31")
+DATES = dict(start_date="2020-01-01", end_date="2024-12-31")  # should be in utils.py
 #DATES = dict(start_date="2001-01-01", end_date="2024-12-31")
 #DATES = dict(start_date="1993-01-01", end_date="2024-12-31")
 
-RAG_PATH = CRSP_RAG_PATH  ### JKP_RAG_PATH
 
 ###########################
 #
@@ -682,14 +675,9 @@ class Panel:
         if isinstance(subset, Panel):  #  and index.nlevels == self.nlevels:
             # only keep indexes that are in subset.frame
             index_df = subset.frame
-            # print('index_df', index_df) ###
             # if df.index.nlevels != index_df.index.nlevels:
             #    raise ValueError("Cannot apply index Panel with different index levels")
-            # print('df', df) ###
             df = df[df.index.isin(index_df.index)]
-            # print('df', df) ###
-            #df = df.join(index_df, how="inner", rsuffix="_index")
-            #df = df.iloc[:, :-1]  # drop the index column
         ### min_stocks = numeric_or_None(min_stocks)
         if is_numeric_dtype(min_stocks) and self.nlevels == 2:
             counts = df.groupby(level=0).size()
@@ -725,8 +713,9 @@ if __name__ == "__main__":
 
     def rag_query(query, top_n=10, as_characteristics: bool=True):
         from server_utils import query_rag
-        from utils import BENCHMARKS_RAG, CHARACTERISTICS_RAG
         from rag import RAG
+        from utils import BENCHMARKS_RAG, CHARACTERISTICS_RAG, CRSP_RAG_PATH, JKP_RAG_PATH
+        RAG_PATH = CRSP_RAG_PATH  ### JKP_RAG_PATH
         char_rag = RAG(CHARACTERISTICS_RAG, out_dir=RAG_PATH).load()
         bench_rag = RAG(BENCHMARKS_RAG, out_dir=RAG_PATH).load()
     
@@ -736,7 +725,6 @@ if __name__ == "__main__":
     #
     # Helpers to display Panels
     #
-
     def evaluate_panels(panel: Panel, ground: Panel, experiment: str = '') -> pd.DataFrame:
         """Evaluate two Panels side by side"""
         if panel.nlevels != ground.nlevels or panel.nlevels < 1:

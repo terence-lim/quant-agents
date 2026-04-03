@@ -1,4 +1,4 @@
-# python coding_server.py
+# python coding_server.py   (c) Terence Lim
 from mcp.server.fastmcp import FastMCP
 import json
 from server_utils import run_code_in_subprocess, log_code

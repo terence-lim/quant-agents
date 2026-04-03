@@ -1,4 +1,5 @@
-# python evaluate_agent.py test_book_value book_value_
+# python evaluate_agent.py test_book_value book_value_       
+# (c) Terence Lim
 import argparse
 import ast
 import json

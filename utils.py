@@ -1,3 +1,4 @@
+# utils.py  (c) Terence Lim
 import json
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -9,30 +10,16 @@ from weasyprint import HTML
 from pathlib import Path
 from typing import List, Dict
 
-#import logging
-#logging.getLogger("fontTools").setLevel(logging.WARNING)
-#logging.getLogger("matplotlib").setLevel(logging.WARNING)
-#logging.getLogger("weasyprint").setLevel(logging.WARNING)
-#logging.disable(logging.WARNING)  # disable all logging messages at or below
-
 OUTPUT = Path("output")
 LINKS = Path("LINKS")
 
+MEDIA = LINKS / "media"
+WORKSPACE = LINKS / "workspace"
+
 BENCHMARKS_RAG = "benchmark_returns"
 CHARACTERISTICS_RAG = "stock_characteristics"
-#JKP_RAG_PATH = Path("/home/terence/Downloads/scratch/2024/JKP/JKP_RAG")
 JKP_RAG_PATH = LINKS / "JKP_RAG"
-
-#CRSP_RAG_PATH = Path("/home/terence/Downloads/scratch/2024/JKP/CRSP_RAG")
 CRSP_RAG_PATH = LINKS / "CRSP_RAG"
-
-# RAG_PATH = JKP_RAG # should move from qrafti.py
-
-#MEDIA = Path("/home/terence/Downloads/scratch/2024/JKP/media")
-MEDIA = LINKS / "media"
-
-#WORKSPACE = Path("/home/terence/Downloads/scratch/2024/JKP/workspace")
-WORKSPACE = LINKS / "workspace"
 
 #
 # Helper utilities

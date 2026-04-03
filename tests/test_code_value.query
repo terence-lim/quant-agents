@@ -7,5 +7,5 @@ where preferred stock is defined as the redemption (pstkrv), liquidation (pstkl)
 or par value (pstk), if available, in that order.
 
 
-Respond with only the panel_id of the final panel constructed without any other text;
-if you cannot complete the request due to errors, then respond with 'MODEL ERROR'.
+Return only the panel_id of the final constructed panel, with no additional text. 
+If the request cannot be completed because of an error, return exactly `MODEL ERROR`.

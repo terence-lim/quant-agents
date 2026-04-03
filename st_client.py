@@ -1,16 +1,16 @@
-# streamlit run st_client.py --server.fileWatcherType="poll"
+# streamlit run st_client.py --server.fileWatcherType="poll"    (c) Terence Lim
 import os
 import streamlit as st
 import asyncio
 import glob
 import base64
-from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 from pydantic_ai.exceptions import UnexpectedModelBehavior
 import logfire
 from client_utils import (load_objects, generate_dot, restart, store_conversation,
                           load_recent_code_logs, SUBGRAPH_PNG)
+from report_utils import glossary_md
 from utils import MEDIA
 from shared_agents import create_agents, create_model
 from agent_delegation import attach_research_delegation_tools
@@ -90,9 +90,6 @@ def build_conversation_context(
 
     lines.append("</conversation_history>")
 
-    # Optional: make it extra explicit what the model should respond to:
-    # If you prefer, you can omit this; but it often improves reliability.
-    # The last user message is typically what matters most.
     last_user_msg = None
     for m in reversed(tail):
         if normalize_role(m.get("role", "")) == "user":
@@ -176,14 +173,6 @@ attach_research_delegation_tools(
     on_result=lambda role, msg: st.session_state.messages.append({"role": role, "content": f"{msg}"}),
     run_agent_safely=run_agent_safely,
 )
-
-
-# --- UI Setup ---
-st.set_page_config(layout="wide", page_title="Quant Research Agents")
-
-# CSS Styling (Same as original)
-#    html, body, [class*="block-container"] { font-size: 14px !important; line-height: 1.0 !important; }
-#    h1, h2, h3 { font-size: 20px !important; }
 
 # --- UI Setup ---
 st.set_page_config(layout="wide", page_title="Quant Research Agents")
@@ -443,12 +432,14 @@ elif page == "Research Report":
             title = "PRELIMINARY - FOR ILLUSTRATION ONLY"
             st.markdown(f"<h1 style='color: red; font-style: italic;'>{title}</h1>", unsafe_allow_html=True)
             st.markdown(md_path.read_text(encoding="utf-8"))
+            if img_path.exists():
+                st.markdown("### Figure 1. CAPM Beta-Adjusted Cumulative Returns")
+                st.image(str(img_path), width='content')
+            else:
+                st.info("No report image found.")
+            st.markdown(glossary_md)
         except Exception as e:
             st.error(f"Failed to read {md_path}: {e}")
     else:
         st.info("No report found.")
 
-    if img_path.exists():
-        st.image(str(img_path), width='content')
-    else:
-        st.info("No report image found.")

@@ -13,11 +13,11 @@ for tracing tool calls and visualizing data artifact connections. It
 demonstrates the use of LLM and agentic capabilities to simplify and
 strengthen quantitative research workflows.
 
-[Download the documentation and case studies appendix](Appendix.pdf)
+[Internet Appendix: documentation and results](Internet_Appendix.pdf)
 
 ## Example Prompts for Using QRAFTI
 
-The following prompts illustrate how a user can work with QRAFTI for replication studies and autonomous factor research (see [case studies in appendix](Appendix.pdf) for full chat transcripts and traces)
+The following prompts illustrate how a user can work with QRAFTI for replication studies and autonomous factor research (see [Internet Appendix B](Internet_Appendix.pdf) for full chat transcripts and traces)
 
 ### 1) Replicate Fama-French HML-style workflow
 
@@ -97,7 +97,7 @@ Please execute the plan and provide a standardized research report.
 
 ## Project Structure
 
-Python modules for running *multi-agent* quantitative research workflows, including data/factor services, user access interface, and empirical analysis tooling (see [documentation in appendix](Appendix.pdf) for details).
+Python modules for running *multi-agent* quantitative research workflows, including data/factor services, user access interface, and empirical analysis tooling (see [Internet Appendix A](Internet_Appendix.pdf) for details).
 
 ### 1) Research Service Layer
 **Files:** `factor_server.py`, `coding_server.py`, `report_server.py`, `server_utils.py`, `research_utils.py`, `report_utils.py`
@@ -115,7 +115,7 @@ Contains client-side interfaces and shared agent composition utilities.
 - `client_utils.py` centralizes reusable client helpers.
 
 ### 3) Financial Intelligence Toolkit
-**Files:** `qrafti.py`, `utils.py`, `portfolio.py`, `rag.py`, `reboot.py`
+**Files:** `qrafti.py`, `utils.py`, `portfolio.py`, `rag.py`, `data_utils.py`
 
 Contains core analytical and orchestration modules for portfolio-focused research workflows, including shared utilities, retrieval-augmented functionality, and operational/restart helpers.
 

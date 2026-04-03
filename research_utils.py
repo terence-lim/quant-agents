@@ -1,10 +1,9 @@
+# research_utils.py   (c) Terence Lim
 from qrafti import Panel, DATE_NAME, STOCK_NAME
 from utils import Calendar
-import json
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-from typing import List, Union, Dict, Tuple
+from typing import List
 from pandas.api.types import is_list_like
 from tqdm import tqdm
 
@@ -23,10 +22,6 @@ def standardize(x) -> pd.Series:
     """
     mean = x.loc[x.iloc[:, 1].astype(bool)].iloc[:, 0].mean()
     std = x.loc[x.iloc[:, 1].astype(bool)].iloc[:, 0].std()
-    #print(x)
-    #print(sum(x.iloc[:, 1].astype(bool)))
-    #print(mean, std)
-    #raise Exception
     if std == 0:
         return pd.Series(0.0, index=x.index)
     else:
@@ -48,10 +43,6 @@ def winsorize(x, lower=0.0, upper=1.0) -> pd.Series:
     lower, upper = (
         x.loc[x.iloc[:, 1].astype(bool)].iloc[:, 0].quantile([lower, upper]).values
     )
-    #print(x)
-    #print(sum(x.iloc[:, 1].astype(bool)))
-    #print(lower, upper)
-    #raise Exception
     return x.iloc[:, 0].clip(lower=lower, upper=upper)
 
 
@@ -132,7 +123,6 @@ def portfolio_weights(x) -> pd.Series:
 #
 # Common functions to be applied on time-series slices with Panel.trend()
 #
-
 def rolling(df: pd.DataFrame, window: int, skip: int = 0, agg: str = "mean", **kwargs) -> pd.Series:
     """Apply a rolling window aggrgation function to a DataFrame.
     Arguments:
@@ -161,7 +151,6 @@ def rolling_regression(x: pd.DataFrame, window: int, coeff: int) -> pd.Series:
         """
         X = np.column_stack([np.ones(len(X)), X])
         if not np.isfinite(X).all() or not np.isfinite(y).all():
-            #betas, residuals = np.array([np.nan] * X.shape[1]), [np.nan]
             return np.array([np.nan] * (X.shape[1] + 1))
         else:
             try:
@@ -170,7 +159,6 @@ def rolling_regression(x: pd.DataFrame, window: int, coeff: int) -> pd.Series:
                 betas = np.linalg.pinv(X) @ y  # fallback to pseudo-inverse
                 residuals = [np.sum((y - X @ betas)**2)]
             return np.concatenate([betas, [residuals[0]/len(residuals[0])]])
-    # [betas[0]/((residuals[0]/len(X))**0.5)]])
     
     results = []
     for end in range(window, len(x) + 1):
@@ -229,7 +217,6 @@ def characteristics_coalesce(*panels, replace: List = []) -> Panel:
     def replace_helper(x, replace: List) -> pd.Series:
         """Helper to replace NaN or listed values in the first column with values from the second column"""
         x[x.columns[0]] = x[x.columns[0]].fillna(x[x.columns[1]])
-        # x.iloc[:, 0] = x.iloc[:, 0].fillna(x.iloc[:, 1].values)
         mask = x.iloc[:, 0].isin(replace)
         x.loc[mask, x.columns[0]] = x.loc[mask, x.columns[1]]
         return x.iloc[:, 0]
@@ -244,7 +231,7 @@ def characteristics_coalesce(*panels, replace: List = []) -> Panel:
     return out_panel
 
 
-def characteristics_resample(characteristics: Panel, ffill: bool = True, month: List | int = []) -> Panel:
+def characteristics_resample(characteristics: Panel, month: List | int = [], ffill: bool = True) -> Panel:
     """
     Resample a characteristics Panel to lower-frequency target dates (e.g., month-ends),
     with optional forward-filling within each sampling window.
@@ -272,15 +259,15 @@ def characteristics_resample(characteristics: Panel, ffill: bool = True, month: 
         A Panel with a 2-level index (date, stock_id) containing cross-sectional
         characteristics observations.
 
-    ffill : bool, default True
-        If True, forward-fill each entity’s characteristics to each sampled target date
-        using the latest observation within the sampling window.
-        If False, keep only observations that occur exactly on the sampled target date.
-
     month : list[int] | int | [], optional
         Target sampling months.
         - []: sample all months in the calendar range.
         - int or list[int] in 1..12: sample only those months (e.g., [3, 9] for Mar/Sep).
+
+    ffill : bool, default True
+        If True, forward-fill each entity’s characteristics to each sampled target date
+        using the latest observation within the sampling window.
+        If False, keep only observations that occur exactly on the sampled target date.
 
     Returns
     -------
@@ -302,10 +289,10 @@ def characteristics_resample(characteristics: Panel, ffill: bool = True, month: 
     # Loop through every month
     for next_date in cal.dates_range(cal.start_date, cal.end_date):
 
-        # If this is a month to resample
+        # If this is a month to sample
         if not month or cal.ismonth(next_date, month):
 
-            # Loop over all months from previous month that was resampled
+            # Loop over all months from previous month that was sampled
             for curr_date in cal.dates_range(prev_date, next_date):
 
                 # If input characteristics have data on this month

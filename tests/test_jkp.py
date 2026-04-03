@@ -51,6 +51,36 @@ Query:
 """ + q3
 
 
+q3a = """
+Use a Reflexion-style planning workflow for the query below.
+
+Phase 1: Suggest a sequential order of steps using your given tools, except the coding_agent tool, and panel data to construct the factor.
+
+Phase 2: Check that each step is implementable with available tools and that the steps can efficiently satisfy the query.
+
+Phase 3: Rewrite the plan, and execute the corrected plan.
+
+Query:
+""" + q3
+
+q3a = """
+Use a Reflexion-style planning workflow for the query below.
+
+Phase 1 — Initial plan:
+Read the entire query carefully and draft a step-by-step plan for completing it. 
+Use your given tools, except the coding_agent tool, and panel data sets.
+
+Phase 2 — Reflection and self-critique:
+Review the draft plan and evaluate it for completeness, feasibility, and efficiency. 
+Check whether each step can be carried out with the available tools and constraints.
+
+Phase 3 — Revised plan:
+Revise the plan to address the issues found during reflection, and execute it.
+
+Query:
+""" + q3
+
+
 query_end = """
 Return only the panel_id of the final constructed panel, with no additional text. 
 If the request cannot be completed because of an error, return exactly `MODEL ERROR`.
@@ -69,8 +99,6 @@ for panel, prompt in zip(out_panels, [q1, q1a, q2, q2a, q3, q3a]):
     print("python agent_cli.py " + query_name)
     print("python evaluate_agent.py " + query_name)    
 
-#raise Exception
-
 # Compute 12-month-skip-1 momentum    
 dates = DATES
 window, skip = 12, 1
@@ -88,6 +116,11 @@ terciles_pf = factor_pf.apply(digitize, reference=decile_pf > 2, cuts=3)
 terciles_pf.save(next(panels) + '_')
 terciles_pf.save(next(panels) + '_')
 
+mom = Panel().load("ret_12_1_ret_vw_cap")
+mom.save(next(panels) + '_')
+mom.save(next(panels) + '_')
+
+"""
 # Compute long-short spread returns
 vwcap_pf = size_pf.apply(winsorize, nyse_pf, lower=0, upper=0.80)
 long_pf = vwcap_pf.apply(portfolio_weights, reference=terciles_pf == 3)
@@ -98,3 +131,4 @@ spreads_pf = long_pf - short_pf
 composite_returns = long_ret - short_ret
 composite_returns.save(next(panels) + '_')
 composite_returns.save(next(panels) + '_')
+"""

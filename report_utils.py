@@ -1,8 +1,8 @@
-from qrafti import Panel, DATE_NAME, STOCK_NAME
+# report_utils.py    (c) Terence Lim
+from qrafti import Panel, DATE_NAME
 from utils import plt_savefig, MEDIA
 from portfolio import PortfolioEvaluation
 from research_utils import digitize, portfolio_weights, portfolio_returns, characteristics_resample
-import json
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -11,6 +11,23 @@ from typing import List, Union, Dict, Tuple
 #
 # Report Writer Function and helpers
 #
+
+glossary_md = """
+## Explanations:
+
+**Table 1** shows the coverage of the signal for names in the investment universe (US-domiciled common stocks in CRSP).
+
+**Table 2** show the coverage of the signal of total market capitalization of the investment universe.
+
+**Table 3** reports the performance of monthly returns of long-short spread portfolios constructed using a value-weighted tercile sort. The annualized mean return,  annualized volatility, skewness, excess kurtosis, information ratio (=annualized mean divided by annualized volatility), and maximum drawdown are shown.
+
+**Table 4** reports the monthly average excess returns from tercile spread portfolios with and without controlling for common factor models. **Panel A** reports the montly mean return and t-statistic.  **Panel B** reports the alpha and t-statistic relative to the CAPM, along with loading on the market factor. **Panel C** reports the alpha and t-statistic relative to the Fama and French three-factor model, along with the loadings on the market (Mkt-Rf), SMB and HML factors.
+
+
+**Table 5** presents results for conditional double sorts on size and signal. In each month, stocks are first sorted into quintiles based on size using NYSE breakpoints. Then, within each size quintile, we form equal-weighted tercile spread portfolios based on the signal. The monthly mean return and t-statistic of abnormal returns, as well as the monthly alpha and t-statistic based on the CAPM and Fama and French three-factor models are shown for each size-quintile subset of stocks.
+
+**Figure 1** plots the cumulative returns of the signal adjusted to market beta = 1 (by adding a static long or short position in Mkt-RF so that the full-sample CAPM market beta becomes equal to 1), compared to the cumulative returns on the market factor (Mkt-RF).
+"""
 
 def returns_metrics(port_returns: Panel) -> Dict[str, float]:
     """Compute summary performance statistics of portfolio returns.
@@ -66,8 +83,6 @@ def write_report(signal: Panel, savefig: str = MEDIA / 'output.png') -> str:
         if num_years >= max_years:
             # 2. Split years into 3 arrays (handles uneven counts automatically)
             subperiod_arrays = np.array_split(years, num_subperiods)
-            # print(years)  ###
-            # print(subperiod_arrays)  ###
             
             # 3. Create a mapping of year -> "Start-End" string
             period_map = {}
@@ -77,7 +92,6 @@ def write_report(signal: Panel, savefig: str = MEDIA / 'output.png') -> str:
                     period_map[y] = label
             
             # 4. Map the years to their subperiod labels
-            # print(df) ###
             df["year"] = df["year"].map(period_map)
         return df.groupby("year")[col].mean().to_frame(name=col) * 100
 
@@ -86,31 +100,30 @@ def write_report(signal: Panel, savefig: str = MEDIA / 'output.png') -> str:
     if len(eom) == 1 or eom[0] > 6 * eom[1]:
         signal = characteristics_resample(signal, month=int(eom.index[0]))
         print(f"Signal resampled to month end of month {eom.index[0]}")  ###
+
+    ### TODO: inner join to SIZE_DECILE universe
         
     # Coverage of count
     name = '% of Names'
     coverage = _compute_coverage(signal.ones_like(), Panel().load("TOTAL_COUNT"))
     coverage = _group_coverage(coverage, name)
-    context.append(f"### {name} Covered by Period\n" + coverage.round(2).to_markdown())
+    context.append(f"### Table 1. {name} Covered by Period\n" + coverage.round(2).to_markdown())
 
     # Coverage of cap
     name = '% of Market Cap'
     cap = Panel().load("CAP").restrict(subset=signal)
     coverage = _compute_coverage(cap, Panel().load("TOTAL_CAP"))
     coverage = _group_coverage(coverage, name)
-    context.append(f"### {name} Covered by Period\n" + coverage.round(2).to_markdown())
+    context.append(f"### Table 2. {name} Covered by Period\n" + coverage.round(2).to_markdown())
 
     # Form portfolio weights
-    # print('signal', signal.frame)  ###
     quantiles = signal.apply(digitize, fill_value=True, cuts=3)
     capvw = Panel().load("CAP").restrict(subset=signal)
-    # print('capvw', capvw.frame)  ###
     q3 = capvw.apply(portfolio_weights, reference=quantiles == 3) #, how="right")
     q1 = capvw.apply(portfolio_weights, reference=quantiles == 1) #, how="right")
     portfolio = q3 - q1
-    # print('portfolio', portfolio.frame)  ###
 
-    # turnover
+    # TODO: turnover
     # drifted = portfolio_impute(portfolio, drifted=True)
     # trades = portfolio.restrict(subset=drifted) - drifted
     # turnover = trades.apply(pd.DataFrame.abs).apply(pd.DataFrame.sum)/2
@@ -120,12 +133,12 @@ def write_report(signal: Panel, savefig: str = MEDIA / 'output.png') -> str:
     stats = returns_metrics(returns)
     df = pd.Series(stats, name="High minus Low").to_frame().T
     context.append(
-        "### Statistics of Tercile Spread Portfolios\n(weighted by market cap winsorized at 80th NYSE percentile)"
+        "### Table 3. Statistics of Tercile Spread Portfolios\n(weighted by market cap)"
     )
     context.append(df.round(4).to_markdown())
 
     # by model
-    context.append("### Alpha, coefficients and t-statistics by Model")
+    context.append("### Table 4. Alpha, coefficients and t-statistics by Model")
     mu,_ = returns_regression(returns, [])
     df = pd.DataFrame(
         {
@@ -212,7 +225,7 @@ def write_report(signal: Panel, savefig: str = MEDIA / 'output.png') -> str:
         )
     df = pd.concat(out, axis=1).rename_axis(index="Model")
     context.append(
-        "### Alpha and t-statistics by Model and Size Quintile\n(lower quintiles have smaller market cap)"
+        "### Table 5. Alpha and t-statistics by Model and Size Quintile\n(lower quintiles have smaller market cap)"
     )
     context.append(df.round(4).to_markdown())
 

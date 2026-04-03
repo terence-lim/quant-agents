@@ -1,4 +1,5 @@
 # python agent_cli.py [test_name]
+# (c) Terence Lim
 import asyncio
 import argparse
 import json
@@ -62,6 +63,7 @@ async def run_agent_safely(agent: Any, query: str, retries: int = RETRIES) -> st
                 return "The agent could not complete the request due to model behavior errors."
             await asyncio.sleep(0.4)
         except Exception as exc:  # pragma: no cover - defensive fallback
+            print(query)
             return f"The agent failed with an unexpected error: {exc}"
 
 

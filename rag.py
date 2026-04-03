@@ -1,3 +1,4 @@
+# rag.py    (c) Terence Lim
 import os
 import pandas as pd
 import numpy as np
@@ -326,20 +327,18 @@ if __name__ == "__main__":
     RAG_PATH = CRSP_RAG_PATH   # JKP_RAG_PATH
 
     rag = RAG(CHARACTERISTICS_RAG, RAG_PATH).load()
-    while False:
-        query = input("Search phrase: ")
-        if not query:
-            break
-        print(rag.retrieve(query, top_n=20).to_string())
+    def test():
+        while True:
+            query = input("Search phrase: ")
+            if not query:
+                break
+            print(rag.retrieve(query, top_n=20).to_string())
 
-    if True:  # delete
+    def test1():  # delete
         rag = RAG(CHARACTERISTICS_RAG, RAG_PATH).load()
-        #rag.delete_document("CAPVW")
-        #rag.delete_document("LOG1P_RET")
-        #rag.delete_document("VW_CAP")
-        #rag.delete_document("SIZE_DECILE")
+        rag.delete_document("SIZE_DECILE")
 
-    if False:  # temp
+    def test2():  # temp
         name = "temp"
         docs = pd.Series(
             {"doc1": "The Eiffel Tower is in Paris.", "doc2": "The Colosseum is in Rome."}
