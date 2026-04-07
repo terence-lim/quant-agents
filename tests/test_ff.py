@@ -40,7 +40,10 @@ Construct the HML factor portfolio as the average of a small and a big value por
 the average of a small and a big growth portfolio in each month. 
 """
 
-q3a = """
+q3a = code_prompt + q3
+
+'''
+q4a = """
 Use a Reflexion-style planning workflow for the query below.
 
 Phase 1 — Initial plan
@@ -57,26 +60,27 @@ Phase 3 — Revised plan
 Revise the plan to address the issues found during reflection, and execute it.
 
 Query:
-""" + q3
+""" + q4
 
-q3a = """
+q4a = """
 Use a Reflexion-style planning workflow for the query below.
 
-Phase 1: Suggest a sequential order of steps using your given tools, except the coding_agent tool, and panel data to construct the factor.
+Phase 1: Suggest a sequential order of steps using your given tools, except coding_agent_tool, and panel data to construct the factor.
 
 Phase 2: Check that each step is implementable with available tools and that the steps can efficiently satisfy the query.
 
 Phase 3: Rewrite the plan, and execute the corrected plan.
 
 Query:
-""" + q3
+""" + q4
+'''
 
 q3a = """
 Use a Reflexion-style planning workflow for the query below.
 
 Phase 1 — Initial plan:
 Read the entire query carefully and draft a step-by-step plan for completing it. 
-Use your given tools, except the coding_agent tool, and panel data sets.
+Use your given tools, except coding_agent_tool, and panel data sets.
 
 Phase 2 — Reflection and self-critique:
 Review the draft plan and evaluate it for completeness, feasibility, and efficiency. 
@@ -88,17 +92,20 @@ Revise the plan to address the issues found during reflection, and execute it.
 Query:
 """ + q3
 
+q3b = code_prompt + q3
+
 query_end = """
-Return only the panel_id of the final constructed panel, with no additional text. 
+Return the id of the final constructed panel.
 If the request cannot be completed because of an error, return exactly `MODEL ERROR`.
 """
+#Return only the results_panel_id of the final constructed panel, with no additional text.
 
 out_panels = ['book_value', 'code_value', 'book_market', 'code_market',
-              'hml_returns', 'hml_reflexion']
+              'hml_returns', 'hml_reflexion', 'hml_code']
 panels = iter(out_panels)
 
 TESTS = Path('tests')
-for panel, prompt in zip(out_panels, [q1, q1a, q2, q2a, q3, q3a]):
+for panel, prompt in zip(out_panels, [q1, q1a, q2, q2a, q3, q3a, q3b]):
     query_name = 'test_' + panel
     with open(TESTS / (query_name + ".query"), "w", encoding="utf-8") as f:
         f.write(prompt)
@@ -106,6 +113,8 @@ for panel, prompt in zip(out_panels, [q1, q1a, q2, q2a, q3, q3a]):
     print("python agent_cli.py " + query_name)
     print("python evaluate_agent.py " + query_name)    
 
+
+raise Exception
 
 dates = DATES
 years = Panel().load('YEARS', **dates)
@@ -134,10 +143,6 @@ book_market = (book_samples / company_value).shift(lags).save(next(panels) + '_'
 book_market.save(next(panels) + '_')
 
 
-hml = Panel().load("HML")
-hml.save(next(panels) + '_')
-hml.save(next(panels) + '_')
-
 """
 # Form size and bm quantiles based on NYSE stocks
 nyse = Panel().load("EXCHCD", **dates) == 1
@@ -163,3 +168,9 @@ composite_returns.save(next(panels) + '_')
 # print(out_panels)
 
 """
+
+hml = Panel().load("HML")
+hml.save(next(panels) + '_')
+hml.save(next(panels) + '_')
+hml.save(next(panels) + '_')
+

@@ -5,9 +5,14 @@ import ast
 import json
 from pathlib import Path
 from statistics import median
+from datetime import datetime
+import itertools
+import numpy as np
 
 from qrafti import Panel
 from utils import OUTPUT
+
+K = 5
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate response panels against a ground panel.")
@@ -36,18 +41,46 @@ def load_response_panel_ids(path: Path) -> list[str]:
             response = _extract_response(raw_line)
             if response:
                 panel_ids.append(response)
-    return panel_ids
+    return panel_ids[-K:]   # return last K responses
 
+def cosine_similarity(x, y):
+    return np.dot(x, y) / (np.linalg.norm(x) * np.linalg.norm(y))
 
-def pearson_against_ground(panel_id: str, ground: Panel) -> float:
+def similarity_against_ground(panel_id: str, ground: Panel, method="cosine") -> float:
+    """cosine, pearson or spearman methods"""
     try:
-        panel = Panel().load(panel_id)    
-        both = panel.frame.dropna().join(ground.frame.dropna(), how="inner", rsuffix="_ground")
-        return round(float(both.corr(method="pearson").fillna(0).iloc[0, 1]), 4)
+        panel = Panel().load(panel_id)
+        panel_df = panel.frame.dropna()
     except:
         print('Error in', panel_id)
         return 0.0
+    if method == "cosine":
+        method = cosine_similarity
+    ground_df = ground.frame.dropna()
+    how = "outer" if panel.nlevels == 2 else "left"
+    both = panel_df.join(ground_df, how=how, rsuffix="_ground").fillna(0)
+    print(f"{len(ground_df)=}, {len(panel_df)=}, {len(both)=}")
+    if len(both):
+        return round(float(both.corr(method=method).fillna(0).iloc[0, 1]), 4)
+    else:
+        return 0.0
 
+
+def corr_k(correlations: list, k: int) -> float:
+    """
+    Compute corr@k_i from a list of precomputed correlations.
+
+    Definition:
+    For every size-k subsample of the N attempts, take the maximum
+    correlation in that subsample. Then average these maxima across
+    all subsamples.
+    """
+    correlations = list(correlations)
+    N = len(correlations)
+    max_corrs = []
+    for subset in itertools.combinations(range(N), k):
+        max_corrs.append(max(correlations[j] for j in subset))
+    return float(np.mean(max_corrs))
 
 if __name__ == "__main__":
     args = parse_args()
@@ -61,17 +94,17 @@ if __name__ == "__main__":
     print(ground_panel_id, responses)
 
     ground = Panel().load(ground_panel_id)
-    pearsons = [pearson_against_ground(panel_id, ground) for panel_id in responses]
+    sims_list = [similarity_against_ground(panel_id, ground) for panel_id in responses]
 
-    avg = sum(pearsons) / len(pearsons)
-    med = median(pearsons)
-    pass_at_1 = pearsons[0]
-    pass_at_3 = max(pearsons[:3])
-    pass_at_k = max(pearsons)
+    avg = sum(sims_list) / len(sims_list)
+    med = median(sims_list)
+    passes = [1, 2, 3, 5, len(sims_list)]
+    vals = [corr_k(sims_list, k) for k in passes]
     
     output_path = OUTPUT / "tests.csv"
-    line = (f"{pass_at_1:.4f} | {pass_at_3:.4f} | {pass_at_k:.4f} | "
-            f"{args.stem} | {avg:.4f} | {med:.4f} | {pearsons}\n")
+    date = str(datetime.now())[:19]
+    line = (" & ".join([f"{v:.4f}" for v in vals]) +
+            f"& {args.stem} & {avg:.4f} & {med:.4f} & {date} & {sims_list}\n")
     with output_path.open("a", encoding="utf-8") as f:
         f.write(line)
     print(line)

@@ -8,10 +8,18 @@ from pathlib import Path
 from typing import Any
 
 from pydantic_ai.exceptions import UnexpectedModelBehavior
+import logfire
 
 from agent_delegation import attach_research_delegation_tools
 from shared_agents import create_agents
 from utils import OUTPUT
+import logging
+
+logging.basicConfig(level=logging.ERROR)
+
+# Configure logging
+#logfire.configure()
+#logfire.instrument_pydantic_ai()
 
 TESTS = Path('tests')
 K = 5
@@ -27,11 +35,11 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def append_evaluation_log(response: str, evaluation_stem: str, mode: str) -> None:
+def append_evaluation_log(response: str, evaluation_stem: str, mode: str, **kwargs) -> None:
     payload = {
         "date": str(datetime.now())[:19],
         "response": response,
-    }
+    } | kwargs
     evaluation_path = OUTPUT / (evaluation_stem + ".responses")
     evaluation_path.parent.mkdir(parents=True, exist_ok=True)
     with evaluation_path.open(mode, encoding="utf-8") as log_file:
@@ -110,20 +118,26 @@ async def main() -> None:
     print(f"Quant Research Agent CLI (single-query mode: running {K} times)")
     with open(TESTS / (args.test + ".query"), "r", encoding="utf-8") as prompt_file:
         query = prompt_file.read().strip()
-    print(f"\nRunning query from {args.test}.query:\n{query}\n")
 
-    mode = 'w'
+    label = f"Running query from {args.test}.query:"
+    print(f"\n{'-'*len(label)}\n{label}\n{'-'*len(label)}\n{query}\n")
+
+    mode = 'a'  ### 'w'
     for run_index in range(1, K + 1):
         messages = [{"role": "user", "content": query}]
         prompt = build_conversation_context(messages)
-        for tries in range(RETRIES):
+        kwargs = {"start": str(datetime.now())[:19]}
+        for tries in range(RETRIES + 1):
             reply = await run_agent_safely(research_agent, prompt)
             if any(word not in reply for word in ["MODEL", "ERROR"]):
                 break
             print(f'Retrying {tries}/{RETRIES}')
+
+        # TODO: handle when [high demand Spike] all in reply
+        kwargs['retries'] = tries
         messages.append({"role": "assistant", "content": reply})
-        append_evaluation_log(reply, args.test, mode=mode)
-        mode = 'a'
+        append_evaluation_log(reply, args.test, mode=mode, **kwargs)
+        ### mode = 'a'
         print(f"\nAgent [{run_index}/{K}]: {reply}")
 
 if __name__ == "__main__":

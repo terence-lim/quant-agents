@@ -5,6 +5,7 @@ import sys
 import os
 import subprocess
 import time
+import tempfile
 from typing import Union, Dict
 
 from qrafti import Panel
@@ -135,20 +136,53 @@ def int_or_None(x: str) -> Union[float, None]:
 # Running Python code
 #
 ###########################
-def run_code_in_subprocess(code_str):
-    #with open("coding.log", "w") as f:
-    #    f.write(f"RUN CODE IN SUBPROCESS: {code_str}\n")
-    env = os.environ.copy()
+#def run_code_in_subprocess(code_str):
+#    #with open("coding.log", "w") as f:
+#    #    f.write(f"RUN CODE IN SUBPROCESS: {code_str}\n")
+#    env = os.environ.copy()
     
-    # prepend your project root to PYTHONPATH
-    project_root = os.getenv("PROJECT_ROOT", "")
-    env["PYTHONPATH"] = (project_root + ":" + env.get("PYTHONPATH", "")).strip(":")
-    proc = subprocess.run(
-        [sys.executable, "-c", code_str], capture_output=True, text=True, env=env
-    )
-    print(f"Subprocess exited with code {proc.returncode}")
-    return proc.stdout, proc.stderr, proc.returncode
+#    # prepend your project root to PYTHONPATH
+#    project_root = os.getenv("PROJECT_ROOT", "")
+#    env["PYTHONPATH"] = (project_root + ":" + env.get("PYTHONPATH", "")).strip(":")
+#    proc = subprocess.run(
+#        [sys.executable, "-c", code_str], capture_output=True, text=True, env=env
+#    )
+#    print(f"Subprocess exited with code {proc.returncode}")
+#    return proc.stdout, proc.stderr, proc.returncode
 
+def run_code_in_subprocess(code_str: str, timeout: int = 900):
+    env = os.environ.copy()
+
+    project_root = os.getenv("PROJECT_ROOT")
+    if project_root:
+        old_pythonpath = env.get("PYTHONPATH", "")
+        env["PYTHONPATH"] = (
+            project_root
+            if not old_pythonpath
+            else project_root + os.pathsep + old_pythonpath
+        )
+#    print(env["PYTHONPATH"])
+    with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as f:
+        f.write(code_str)
+        path = f.name
+
+    try:
+        proc = subprocess.run(
+            [sys.executable, path],
+            capture_output=True,
+            text=True,
+            env=env,
+            #timeout=timeout,
+        )
+        print(f"Subprocess exited with code {proc.returncode}")
+        print('stdout:', proc.stdout)
+        print('stderr:', proc.stderr)
+        return proc.stdout, proc.stderr, proc.returncode
+    finally:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
 
 if __name__ == "__main__":
     tic = time.time()

@@ -14,17 +14,58 @@ from rag import RAG
 from research_utils import (winsorize, standardize, digitize, characteristics_coalesce, characteristics_resample,
                             portfolio_weights, portfolio_returns, rolling, regression_residuals)
 from server_utils import panel_or_numeric, str_or_None, bool_or_None, int_or_None, log_tool, query_rag
-from utils import plt_savefig, BENCHMARKS_RAG, CHARACTERISTICS_RAG, JKP_RAG_PATH, CRSP_RAG_PATH
-RAG_PATH = CRSP_RAG_PATH  # JKP_RAG_PATH
+from utils import plt_savefig
 
 logging.basicConfig(level=logging.DEBUG)
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
+port = 8000
+mcp = FastMCP("research-server", host="0.0.0.0", port=port)
+
+from utils import BENCHMARKS_RAG, CHARACTERISTICS_RAG, JKP_RAG_PATH, CRSP_RAG_PATH
+RAG_PATH = CRSP_RAG_PATH  # JKP_RAG_PATH
 char_rag = RAG(CHARACTERISTICS_RAG, out_dir=RAG_PATH).load()
 bench_rag = RAG(BENCHMARKS_RAG, out_dir=RAG_PATH).load()
 
-port = 8000
-mcp = FastMCP("research-server", host="0.0.0.0", port=port)
+@mcp.tool()
+def Panel_lookup(query: str, panel_type: str) -> dict:
+    """
+    Lookup Panel identifiers and descriptions using a natural-language query or an ID-like string.
+
+    When to call this tool:
+      - You have a partial/approximate Panel name/description and want the best matches.
+      - You have something that looks like an ID and want to retrieve the closest matching entries.
+
+    How to choose `panel_type`:
+      - "characteristics": search stock characteristics Panels (signals/factors/attributes).
+      - "benchmarks": search benchmark portfolio return Panels (index/benchmark return series).
+
+    Args:
+        query: Keywords / phrase / ID-like string describing what you want to find.
+        panel_type: One of {"characteristics","benchmarks"} controlling which catalog(s) to search.
+
+    Returns:
+        A dict of best matches (top 10 per catalog searched). The structure mirrors the underlying
+        RAG result format and will contain Panel IDs and their descriptions. On failure, returns:
+            {"error": "<traceback>"}.
+    """
+    try:
+        if panel_type not in {"characteristics", "benchmarks"}:
+            raise ValueError(
+                f"Invalid panel_type={panel_type!r}. Must be one of "
+                f"{{'characteristics','benchmarks'}}."
+            )
+        out = query_rag(query, rag=char_rag if panel_type in {"characteristics"} else bench_rag, top_n=10)
+
+    except Exception:
+        out = dict(error=traceback.format_exc())
+
+    log_tool(
+        tool="Panel_lookup",
+        input=dict(query=query, panel_type=panel_type),
+        output=out,
+    )
+    return out
 
 @mcp.tool()
 def Panel_binary_op(
@@ -273,46 +314,6 @@ def Panel_lag(panel_id: str, months: int = 1) -> str:
              input=dict(panel_id=panel_id, months=months),
              output=out)
     return json.dumps(out)
-
-@mcp.tool()
-def Panel_lookup(query: str, panel_type: str) -> dict:
-    """
-    Lookup Panel identifiers and descriptions using a natural-language query or an ID-like string.
-
-    When to call this tool:
-      - You have a partial/approximate Panel name/description and want the best matches.
-      - You have something that looks like an ID and want to retrieve the closest matching entries.
-
-    How to choose `panel_type`:
-      - "characteristics": search stock characteristics Panels (signals/factors/attributes).
-      - "benchmarks": search benchmark portfolio return Panels (index/benchmark return series).
-
-    Args:
-        query: Keywords / phrase / ID-like string describing what you want to find.
-        panel_type: One of {"characteristics","benchmarks"} controlling which catalog(s) to search.
-
-    Returns:
-        A dict of best matches (top 10 per catalog searched). The structure mirrors the underlying
-        RAG result format and will contain Panel IDs and their descriptions. On failure, returns:
-            {"error": "<traceback>"}.
-    """
-    try:
-        if panel_type not in {"characteristics", "benchmarks"}:
-            raise ValueError(
-                f"Invalid panel_type={panel_type!r}. Must be one of "
-                f"{{'characteristics','benchmarks'}}."
-            )
-        out = query_rag(query, rag=char_rag if panel_type in {"characteristics"} else bench_rag, top_n=10)
-
-    except Exception:
-        out = dict(error=traceback.format_exc())
-
-    log_tool(
-        tool="Panel_lookup",
-        input=dict(query=query, panel_type=panel_type),
-        output=out,
-    )
-    return out
 
 @mcp.tool()
 def Panel_standardize(panel_id: str, reference_panel_id: str = '') -> str:

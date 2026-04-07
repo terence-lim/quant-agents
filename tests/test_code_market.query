@@ -14,5 +14,5 @@ by the company market capitalization (CAPCO) at the end of the year.
 Then construct book-to-market equity in June as the lagged values from the previous December.
 
 
-Return only the panel_id of the final constructed panel, with no additional text. 
+Return only the results_panel_id of the final constructed panel, with no additional text. 
 If the request cannot be completed because of an error, return exactly `MODEL ERROR`.

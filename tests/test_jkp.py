@@ -29,13 +29,14 @@ The factor returns are then defined as the top-tercile portfolio return minus
 the bottom-tercile portfolio return.
 """
 
+'''
 q3a = """
 Use a Reflexion-style planning workflow for the query below.
 
 Phase 1 — Initial plan
 Read the entire query carefully and draft a step-by-step plan for completing it. 
 The plan should be explicit, ordered, and scoped to the full task.
-Use your given tools, except the coding_agent tool, and panel data sets.
+Use your given tools, except coding_agent_tool, and panel data sets.
 
 Phase 2 — Reflection and self-critique
 Review the draft plan and evaluate it for completeness, feasibility, and efficiency. Check whether each step:
@@ -54,7 +55,7 @@ Query:
 q3a = """
 Use a Reflexion-style planning workflow for the query below.
 
-Phase 1: Suggest a sequential order of steps using your given tools, except the coding_agent tool, and panel data to construct the factor.
+Phase 1: Suggest a sequential order of steps using your given tools, except coding_agent_tool, and panel data to construct the factor.
 
 Phase 2: Check that each step is implementable with available tools and that the steps can efficiently satisfy the query.
 
@@ -62,13 +63,14 @@ Phase 3: Rewrite the plan, and execute the corrected plan.
 
 Query:
 """ + q3
+'''
 
 q3a = """
 Use a Reflexion-style planning workflow for the query below.
 
 Phase 1 — Initial plan:
 Read the entire query carefully and draft a step-by-step plan for completing it. 
-Use your given tools, except the coding_agent tool, and panel data sets.
+Use your given tools, except coding_agent_tool, and panel data sets.
 
 Phase 2 — Reflection and self-critique:
 Review the draft plan and evaluate it for completeness, feasibility, and efficiency. 
@@ -80,24 +82,28 @@ Revise the plan to address the issues found during reflection, and execute it.
 Query:
 """ + q3
 
+q3b = code_prompt + q3
 
 query_end = """
-Return only the panel_id of the final constructed panel, with no additional text. 
+Return the id of the final constructed panel.
 If the request cannot be completed because of an error, return exactly `MODEL ERROR`.
 """
+#Return only the results_panel_id of the final constructed panel, with no additional text.
 
 out_panels = ['price_momentum', 'code_momentum', 'mom_terciles', 'code_terciles',
-              'mom_returns', 'mom_reflexion']
+              'mom_returns', 'mom_reflexion', 'mom_code']
 panels = iter(out_panels)
 
 TESTS = Path('tests')
-for panel, prompt in zip(out_panels, [q1, q1a, q2, q2a, q3, q3a]):
+for panel, prompt in zip(out_panels, [q1, q1a, q2, q2a, q3, q3a, q3b]):
     query_name = 'test_' + panel
     with open(TESTS / (query_name + ".query"), "w", encoding="utf-8") as f:
         f.write(prompt)
         f.write('\n' + query_end)
     print("python agent_cli.py " + query_name)
     print("python evaluate_agent.py " + query_name)    
+
+raise Exception
 
 # Compute 12-month-skip-1 momentum    
 dates = DATES
@@ -119,12 +125,14 @@ terciles_pf.save(next(panels) + '_')
 mom = Panel().load("ret_12_1_ret_vw_cap")
 mom.save(next(panels) + '_')
 mom.save(next(panels) + '_')
+mom.save(next(panels) + '_')
 
 """
 # Compute long-short spread returns
 vwcap_pf = size_pf.apply(winsorize, nyse_pf, lower=0, upper=0.80)
 long_pf = vwcap_pf.apply(portfolio_weights, reference=terciles_pf == 3)
 short_pf = vwcap_pf.apply(portfolio_weights, reference=terciles_pf == 1)
+
 long_ret = portfolio_returns(long_pf)
 short_ret = portfolio_returns(short_pf)
 spreads_pf = long_pf - short_pf

@@ -1,3 +1,7 @@
+
+You may only use the coding_agent_tool and the Panel_lookup tools;
+do not use any other tools to respond to the following query:
+
 Construct book equity as stockholder equity (seq) minus the book value of preferred stock, 
 where preferred stock is defined as the redemption (pstkrv), liquidation (pstkl), 
 or par value (pstk), if available, in that order.
@@ -8,6 +12,16 @@ or par value (pstk), if available, in that order.
 Each December, divide book equity of a firm’s fiscal year-end at or before December 
 by the company market capitalization (CAPCO) at the end of the year. 
 Then construct book-to-market equity in June as the lagged values from the previous December.
+Sort stocks independently on market equity (CAP) into small and big stocks using 
+the median market capitalization of all stocks traded on the NYSE as breakpoints, 
+and on book-to-market equity into growth, neutral, and value stocks using the 30th and 70th 
+percentiles of book-to-market equity of all stocks traded on the NYSE as breakpoints.
+
+Form portfolios as the intersection of these sorts, 
+where the portfolios are weighted by market equity (CAP).
+
+Construct the HML factor portfolio as the average of a small and a big value portfolio minus 
+the average of a small and a big growth portfolio in each month. 
 
 
 Return only the results_panel_id of the final constructed panel, with no additional text. 

@@ -1,9 +1,17 @@
 
 Use a Reflexion-style planning workflow for the query below.
 
-Phase 1: Suggest a sequential order of steps using your given tools, except the coding_agent tool, and panel data to construct the factor.
-Phase 2: Check that each step is implementable with available tools and that the steps can efficiently satisfy the query.
-Phase 3: Rewrite the plan, and execute the corrected plan.
+Phase 1 — Initial plan:
+Read the entire query carefully and draft a step-by-step plan for completing it. 
+Use your given tools, except coding_agent_tool, and panel data sets.
+
+Phase 2 — Reflection and self-critique:
+Review the draft plan and evaluate it for completeness, feasibility, and efficiency. 
+Check whether each step can be carried out with the available tools and constraints.
+
+Phase 3 — Revised plan:
+Revise the plan to address the issues found during reflection, and execute it.
+
 Query:
 Construct book equity as stockholder equity (seq) minus the book value of preferred stock, 
 where preferred stock is defined as the redemption (pstkrv), liquidation (pstkl), 
@@ -27,5 +35,5 @@ Construct the HML factor portfolio as the average of a small and a big value por
 the average of a small and a big growth portfolio in each month. 
 
 
-Return only the panel_id of the final constructed panel, with no additional text. 
+Return only the results_panel_id of the final constructed panel, with no additional text. 
 If the request cannot be completed because of an error, return exactly `MODEL ERROR`.
