@@ -5,9 +5,36 @@ output/
 .ignore
 .*~
 *.*~
-#*
-.#*
 run*.py
+
+# Build and distribution folders
+.tmp/
+
+# Environment variables (Sensitive data)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Editor/IDE configurations
+.vscode/
+
+# Local History for Visual Studio Code
+.history/
+
+# Built-in VS Code workspace file
+*.code-workspace
+
+# Emacs temporary and backup files
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+.\#*
+
+# Compiled Lisp files
+*.elc
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
