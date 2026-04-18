@@ -4,7 +4,7 @@
 
 A tool-augmented multi-agent framework designed to emulate a
 quantitative research team, QRAFTI integrates (1) an empirical
-research Python toolkit built for *(date, stock)* panel data, (2)
+research Python toolkit built for *panel* data, (2)
 Model Context Protocol (MCP) tool servers that expose data- and
 factor-manipulation operations as callable tools, (3) specialized
 Pydantic-AI agents for factor research, standardized reporting, and
@@ -99,6 +99,9 @@ Please execute the plan and provide a standardized research report.
 
 Python modules for running *multi-agent* quantitative research workflows, including data/factor services, user access interface, and empirical analysis tooling (see [Internet Appendix A](Internet_Appendix.pdf) for details).
 
+![Agentic Framework](architecture.png)
+
+
 ### 1) Research Service Layer
 **Files:** `factor_server.py`, `coding_server.py`, `report_server.py`, `server_utils.py`, `research_utils.py`, `report_utils.py`
 
@@ -110,7 +113,7 @@ Provides the service-side components for exposing factor computations, custom to
 Contains client-side interfaces and shared agent composition utilities.
 - `shared_agents.py` defines reusable model + agent factories used by multiple apps.
 - `agent_delegation.py` defines reusable delegation tool wiring (`report_agent_tool`, `coding_agent_tool`) that can be attached to the research agent in any runtime.
-- `st_client.py` remains the Streamlit UI entrypoint and imports the shared factories.
+- `st_client.py` is the Streamlit UI entrypoint and imports the shared factories.
 - `agent_cli.py` is a standalone Python CLI example showing how to use the same agents outside Streamlit.
 - `client_utils.py` centralizes reusable client helpers.
 
@@ -122,9 +125,6 @@ Contains core analytical and orchestration modules for portfolio-focused researc
 ### 4) Data Sources
 
 CRSP, Compustat
-
-
-![Agentic Framework](architecture.png)
 
 
 
