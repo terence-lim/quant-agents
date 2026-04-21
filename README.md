@@ -13,11 +13,14 @@ for tracing tool calls and visualizing data artifact connections. It
 demonstrates the use of LLM and agentic capabilities to simplify and
 strengthen quantitative research workflows.
 
+Lim, T., Muthuraman, K., & Sury, M. (2026). *QRAFTI: An agentic framework for empirical research in quantitative finance* [Preprint]. arXiv. [https://arxiv.org/abs/2604.18500](https://arxiv.org/abs/2604.18500)
+
+
 [Internet Appendix: documentation and results](Internet_Appendix.pdf)
 
-## Example Prompts for Using QRAFTI
+## QRAFTI Usage Examples
 
-The following prompts illustrate how a user can work with QRAFTI for replication studies and autonomous factor research (see [Internet Appendix B](Internet_Appendix.pdf) for full chat transcripts and traces)
+The following prompts illustrate how a user can work with QRAFTI for replication studies and autonomous factor research (see [Internet Appendix B](Internet_Appendix.pdf) for full conversation histories and traces)
 
 ### 1) Replicate Fama-French HML-style workflow
 
