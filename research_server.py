@@ -9,7 +9,7 @@ import traceback
 import warnings
 import logging
 
-from qrafti import Panel, DATES
+from qrafti import Panel
 from rag import RAG
 from research_utils import (winsorize, standardize, digitize, characteristics_coalesce, characteristics_resample,
                             portfolio_weights, portfolio_returns, rolling, regression_residuals)
@@ -22,8 +22,7 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 port = 8000
 mcp = FastMCP("research-server", host="0.0.0.0", port=port)
 
-from utils import BENCHMARKS_RAG, CHARACTERISTICS_RAG, JKP_RAG_PATH, CRSP_RAG_PATH
-RAG_PATH = CRSP_RAG_PATH  # JKP_RAG_PATH
+from utils import BENCHMARKS_RAG, CHARACTERISTICS_RAG, RAG_PATH
 char_rag = RAG(CHARACTERISTICS_RAG, out_dir=RAG_PATH).load()
 bench_rag = RAG(BENCHMARKS_RAG, out_dir=RAG_PATH).load()
 
@@ -109,8 +108,8 @@ def Panel_binary_op(
         or {"error": "...traceback..."} on failure.
     """
     try:
-        p1 = panel_or_numeric(left, **DATES)
-        p2 = panel_or_numeric(right, **DATES)
+        p1 = panel_or_numeric(left)
+        p2 = panel_or_numeric(right)
 
         ops = {
             "add": lambda a, b: a + b,
@@ -180,7 +179,7 @@ def Panel_unary_op(
         or {"error": "...traceback..."} on failure.
     """
     try:
-        p1 = panel_or_numeric(panel_id, **DATES)
+        p1 = panel_or_numeric(panel_id)
 
         if op == "neg":
             p3 = Panel(-p1)
@@ -236,7 +235,7 @@ def Panel_isin(panel_id: str | int | float, values: List[int]) -> str:
         JSON string containing the identifier of the persisted Panel with boolean values.
     """
     try:
-        p1 = panel_or_numeric(panel_id, **DATES)
+        p1 = panel_or_numeric(panel_id)
         p2 = p1.apply(lambda df: df.isin(values))
         out = p2.as_payload()
     except Exception as e:
@@ -260,9 +259,9 @@ def Panel_restrict(panel_id: str, mask_panel_id: Optional[str] = None,
         JSON string containing the identifier of the persisted filtered Panel.
     """
     try:
-        p1 = panel_or_numeric(panel_id, **DATES)
-        mask_panel = panel_or_numeric(mask_panel_id, **DATES)
-        subset_panel = panel_or_numeric(subset_panel_id, **DATES)
+        p1 = panel_or_numeric(panel_id)
+        mask_panel = panel_or_numeric(mask_panel_id)
+        subset_panel = panel_or_numeric(subset_panel_id)
         kwargs = dict(min_value=1e-6) if bool_or_None(positive) else {}
         p2 = p1.restrict(mask=mask_panel, subset=subset_panel, **kwargs)
         out = p2.as_payload()
@@ -304,7 +303,7 @@ def Panel_lag(panel_id: str, months: int = 1) -> str:
         or an error payload if the operation fails.
     """
     try:
-        p1 = panel_or_numeric(panel_id, **DATES)
+        p1 = panel_or_numeric(panel_id)
         months = int_or_None(months)
         p2 = p1.shift(shift=months)
         out = p2.as_payload()
@@ -328,8 +327,8 @@ def Panel_standardize(panel_id: str, reference_panel_id: str = '') -> str:
         JSON string containing the identifier of the persisted standardized Panel.
     """
     try:
-        p1 = panel_or_numeric(panel_id, **DATES)
-        p2 = panel_or_numeric(reference_panel_id, **DATES)
+        p1 = panel_or_numeric(panel_id)
+        p2 = panel_or_numeric(reference_panel_id)
         p3 = p1.apply(standardize, 1 if p2 is None else p2)  # if p2 is None, then use all
         out = p3.as_payload()
     except Exception as e:
@@ -354,8 +353,8 @@ def Panel_winsorize(panel_id: str, reference_panel_id: str = '', lower: float = 
         JSON string containing the identifier of the persisted winsorized Panel.
     """
     try:
-        p1 = panel_or_numeric(panel_id, **DATES)
-        p2 = panel_or_numeric(reference_panel_id, **DATES)
+        p1 = panel_or_numeric(panel_id)
+        p2 = panel_or_numeric(reference_panel_id)
         p3 = p1.apply(winsorize, 1 if p2 is None else p2, lower=lower, upper=upper)
         out = p3.as_payload()
     except Exception as e:
@@ -399,8 +398,8 @@ def Panel_quantiles(panel_id: str, cuts: int | list[float], reference_panel_id: 
              integers starting from 1 up to the number of bins.    
     """
     try:
-        p1 = panel_or_numeric(panel_id, **DATES)
-        p2 = panel_or_numeric(reference_panel_id, **DATES)
+        p1 = panel_or_numeric(panel_id)
+        p2 = panel_or_numeric(reference_panel_id)
         p3 = p1.apply(digitize, 1 if p2 is None else p2, cuts=cuts, ascending=ascending)
         out = p3.as_payload()
     except Exception as e:
@@ -420,7 +419,7 @@ def Panel_characteristics_coalesce(panel_ids: List[str]) -> str:
         JSON string containing the persisted panel identifier for the filled panel.
     """
     try:
-        panels = [panel_or_numeric(pid, **DATES) for pid in panel_ids]
+        panels = [panel_or_numeric(pid) for pid in panel_ids]
         filled = characteristics_coalesce(*panels, replace=[0])
         out = filled.as_payload()
     except Exception as e:
@@ -477,7 +476,7 @@ def Panel_characteristics_resample(
         or an error payload if the operation fails.
     """
     try:
-        characteristics = panel_or_numeric(panel_id, **DATES)
+        characteristics = panel_or_numeric(panel_id)
         samples = characteristics_resample(characteristics, ffill=ffill, month=month)
         out = samples.as_payload()
     except Exception as e:
@@ -514,7 +513,7 @@ def Panel_annual_change(panel_id: str, op: str = "pct", quarterly: bool = False)
         or {"error": "...traceback..."} on failure.
     """
     try:
-        p1 = panel_or_numeric(panel_id, **DATES)
+        p1 = panel_or_numeric(panel_id)
 
         if op not in {"pct", "diff"}:
             raise ValueError("op must be either 'pct' or 'diff'")
@@ -563,7 +562,7 @@ def Panel_rolling(panel_id: str, window: int, skip: int = 0, agg: str = "sum", i
         JSON string containing the identifier of the persisted panel of rolling statistics.
     """
     try:
-        p1 = panel_or_numeric(panel_id, **DATES)
+        p1 = panel_or_numeric(panel_id)
         p2 = p1.trend(rolling, window=window, skip=skip, agg=agg, interval=interval)
         p3 = p2
         out = p3.as_payload()
@@ -601,7 +600,7 @@ def Panel_portfolio_returns(panel_id: str) -> str:
         they will implicitly be imputed by drifting the prior month's stock weights.
     """ 
     try:
-        p_weights = Panel().load(str_or_None(panel_id), **DATES)
+        p_weights = Panel().load(str_or_None(panel_id))
         p_returns = portfolio_returns(p_weights)
         out = p_returns.as_payload()
     except Exception as e:
@@ -634,8 +633,8 @@ def Panel_portfolio_weights(panel_id: str, other_panel_id: str = None) -> str:
         str: A JSON payload containing the new `panel_id` for the resulting panel of portfolio weights
     """
     try:
-        p1 = panel_or_numeric(panel_id, **DATES)
-        p2 = panel_or_numeric(other_panel_id, **DATES)
+        p1 = panel_or_numeric(panel_id)
+        p2 = panel_or_numeric(other_panel_id)
         p3 = p2.apply(portfolio_weights, p1, fill_value=0)
         out = p3.as_payload()
     except Exception as e:
@@ -657,8 +656,8 @@ def Panel_plot(panel_id: str, other_panel_id: str = '', kind: str ='line', title
         str: A JSON payload containing the image file name to be reported to the user.
     """
     try:
-        p1 = panel_or_numeric(panel_id, **DATES)
-        p2 = panel_or_numeric(other_panel_id, **DATES)
+        p1 = panel_or_numeric(panel_id)
+        p2 = panel_or_numeric(other_panel_id)
         if p2:
             ax = p1.plot(p2, kind=kind, title=title)
         else:

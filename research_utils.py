@@ -7,8 +7,11 @@ from typing import List
 from pandas.api.types import is_list_like
 from tqdm import tqdm
 
+EXCESS_RETURNS = "mthexcret"
+PRICE_RETURNS = "mthretx"
+
 #
-# Common tools to applied on cross-sectional slices with Panel.apply()
+# Common helpers to applied on cross-sectional slices with Panel.apply()
 #
 def standardize(x) -> pd.Series:
     """Standardize the first column based on the mean and std of the true rows in the last column.
@@ -84,7 +87,7 @@ def digitize(x, cuts: int | List[float], ascending: bool = True) -> pd.Series:
         q = np.linspace(0, 1, cuts + 1)
     # drop rows in x where first column is NaN
     x = x.dropna(subset=[x.columns[0]])
-    breakpoints = x.loc[x.iloc[:, 1].astype(bool), x.columns[0]].quantile(q=q).values
+    breakpoints = x.loc[x.iloc[:, 1].astype(bool), x.columns[0]].quantile(q=q).to_numpy().copy()
     breakpoints[0] = -np.inf
     breakpoints[-1] = np.inf
     # Degenerate cross-sections can produce repeated quantile edges (e.g., [6, 6]).
@@ -96,10 +99,10 @@ def digitize(x, cuts: int | List[float], ascending: bool = True) -> pd.Series:
     ranks = pd.cut( x.iloc[:, 0], bins=breakpoints, labels=labels, include_lowest=True, )
     if not ascending:
         ranks = len(breakpoints) - ranks.astype(int) + 1
-    return ranks.astype(int)        
+    return ranks.astype(int)
 
 def portfolio_weights(x) -> pd.Series:
-    """Scale the the portfolio weights to sum 1.0
+    """Scale the portfolio weights to sum 1.0
     Arguments:
         x: DataFrame with at least two columns, first column is the raw unscaled weights,
            last column is a boolean indicator for which rows to keep in the portfolio
@@ -109,19 +112,20 @@ def portfolio_weights(x) -> pd.Series:
         panel_frame.apply(portfolio_weights)
     """
     # set weights to zero for rows where second column is False
-    x.loc[~x.iloc[:, 1].astype(bool), x.columns[0]] = 0.0
-    long_weight = x.loc[x.iloc[:, 0] > 0, x.columns[0]].sum()
-    short_weight = x.loc[x.iloc[:, 0] < 0, x.columns[0]].sum()
-    if abs(long_weight) < 1e-6 and abs(short_weight) < 1e-6:
-        total_weight = (abs(long_weight) + abs(short_weight)) / 2
-    else:   # long-only or short-only portfolio
-        total_weight = abs(long_weight) + abs(short_weight)
-    if total_weight == 0:
-        return x.iloc[:, 0].rename(x.columns[0])
-    return x.iloc[:, 0].div(total_weight).rename(x.columns[0])
+    weights = x.iloc[:, 0].astype(float)
+    weights[~x.iloc[:, 1].astype(bool)] = 0.0
+    long_weight = weights[weights > 0].sum()
+    short_weight = weights[weights < 0].sum()
+    total_weight = long_weight + short_weight  
+    if total_weight < 1e-6 or abs(long_weight) < 1e-6 or abs(short_weight) < 1e-6:
+        total_weight = abs(long_weight) + abs(short_weight)  # market-neutral or one-sided
+    if total_weight < 1e-6:
+        return weights.rename(x.columns[0])
+    weights = weights / total_weight
+    return weights.rename(x.columns[0])
 
 #
-# Common functions to be applied on time-series slices with Panel.trend()
+# Common helpers to be applied on time-series slices with Panel.trend()
 #
 def rolling(df: pd.DataFrame, window: int, skip: int = 0, agg: str = "mean", **kwargs) -> pd.Series:
     """Apply a rolling window aggrgation function to a DataFrame.
@@ -202,7 +206,7 @@ def regression_residuals(x: pd.DataFrame) -> pd.Series:
         return pd.Series(residuals, index=x.index)
 
 #
-# Panel Advanced Functions on Stock Characteristics
+# Advanced Panel functions on stock characteristics
 #
 def characteristics_coalesce(*panels, replace: List = []) -> Panel:
     """Coalesce non-missing values from other Panels in order
@@ -317,7 +321,7 @@ def characteristics_resample(characteristics: Panel, month: List | int = [], ffi
 
 
 #
-# Panel Advanced Functions on Portfolio Weights
+# Advanced Panel functions on portfolio weights
 #
 def portfolio_impute(port_weights: Panel, normalize: bool = True, drifted: bool = False) -> Panel:
     """Impute missing portfolio weights on missing dates by forward drifting previous weights based on
@@ -337,7 +341,7 @@ def portfolio_impute(port_weights: Panel, normalize: bool = True, drifted: bool 
     assert port_weights.nlevels == 2, "Portfolio weights must have two index levels"
     # should be ending dates of observed return, to align with dates of weights after drifting
     dates = dict(start_date=None, end_date=None)
-    retx = Panel().load("RETX", **dates)  ### Panel().load("ret_exc_lead1m", **dates).shift(1)
+    retx = Panel().load(PRICE_RETURNS, **dates)  ### Panel().load("ret_exc_lead1m", **dates).shift(1)
     portfolio_dates = port_weights.dates
     cal = Calendar(start_date=portfolio_dates[0], end_date=portfolio_dates[-1])
     all_dates = cal.dates_range(cal.start_date, cal.end_date)
@@ -413,6 +417,6 @@ def portfolio_returns(port_weights: "Panel") -> "Panel":
     """
     # should be leading dates, to compute returns realized in the month ahead
     dates = dict(start_date=None, end_date=None)
-    stock_returns = Panel().load("EXCRET", **dates).shift(-1)  ### Panel().load("ret_exc_lead1m", **dates)
+    stock_returns = Panel().load(EXCESS_RETURNS, **dates).shift(-1)  ### Panel().load("ret_exc_lead1m", **dates)
     port_weights = portfolio_impute(port_weights, normalize=True)
     return (port_weights @ stock_returns).shift(1)

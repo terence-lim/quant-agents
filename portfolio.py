@@ -12,7 +12,7 @@ class PortfolioEvaluation:
         PortfolioEvaluation(portfolio.frame)    
     """
     def __init__(self, returns: pd.DataFrame, annualization: int = 12):
-        self.returns = returns
+        self.returns = returns  # portfolio excess returns
         self.annualization = annualization
 
     def annualized_volatility(self) -> float:
@@ -29,8 +29,8 @@ class PortfolioEvaluation:
             avg_ret = self.returns.mean().values[0] * self.annualization
         return float(avg_ret)
     
-    def information_ratio(self) -> float:
-        """Compute the annualized information ratio of the portfolio returns."""
+    def sharpe_ratio(self) -> float:
+        """Compute the annualized sharpe ratio of the portfolio returns."""
         vol = self.annualized_volatility()
         if vol == 0:
             return 0.0
@@ -101,15 +101,15 @@ class PortfolioEvaluation:
             "adj_r2": float(res.rsquared_adj),
         }, res.resid
 
-    def metrics(self) -> Dict[str, float]:
+    def annualized_metrics(self, digits=None) -> Dict[str, float]:
         """Compute key portfolio returns performance metrics."""
         return {
-            'Annualized Return': self.annualized_return(),
-            'Volatility': self.annualized_volatility(),
-            'Skewness': self.skewness(),
-            'Excess Kurtosis': self.excess_kurtosis(),
-            'Information Ratio': self.information_ratio(),
-            'Max Drawdown': self.max_drawdown(),
+            'Mean': round(self.annualized_return(), digits),
+            'Volatility': round(self.annualized_volatility(), digits),
+            'Skewness': round(self.skewness(), digits),
+            'Excess Kurt.': round(self.excess_kurtosis(), digits),
+            'Sharpe Ratio': round(self.sharpe_ratio(), digits),
+            'Max Drawdown': round(self.max_drawdown(), digits),
             'Num Obs': len(self.returns),
             'Start Date': self.returns.index[0].strftime('%Y-%m-%d'),
             'End Date': self.returns.index[-1].strftime('%Y-%m-%d'),

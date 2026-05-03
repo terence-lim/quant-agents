@@ -1,6 +1,6 @@
 # qrafti.py  (c) Terence Lim
 
-from utils import DataCache, Calendar
+from utils import DataCache, Calendar, DATES
 import pandas as pd
 import numpy as np
 import json
@@ -15,13 +15,8 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 logging.disable(logging.DEBUG)
 #pd.set_option("future.no_silent_downcasting", True)  # for fillna behavior
 
-STOCK_NAME = "permno"
-DATE_NAME = "eom"
-
-DATES = dict(start_date="2020-01-01", end_date="2024-12-31")  # should be in utils.py
-#DATES = dict(start_date="2001-01-01", end_date="2024-12-31")
-#DATES = dict(start_date="1993-01-01", end_date="2024-12-31")
-
+STOCK_NAME = "asset"
+DATE_NAME = "date"
 
 ###########################
 #
@@ -195,7 +190,7 @@ class Panel:
             frame = pd.DataFrame(1, index=self._frame.index, columns=self._frame.columns)
             return Panel(frame, name = self.name)
 
-    def load(self, name: str, start_date: str = None, end_date: str = None) -> "Panel":
+    def load(self, name: str, start_date: str = DATES['start_date'], end_date: str = DATES['end_date']) -> "Panel":
         """Load a cached DataFrame file into this Panel.
         Arguments:
             name: Name of the cached DataFrame file (without extension)
@@ -677,7 +672,15 @@ class Panel:
             index_df = subset.frame
             # if df.index.nlevels != index_df.index.nlevels:
             #    raise ValueError("Cannot apply index Panel with different index levels")
-            df = df[df.index.isin(index_df.index)]
+            if df.index.nlevels == index_df.index.nlevels:
+                df = df[df.index.isin(index_df.index)]
+
+            elif df.index.nlevels == 2 and index_df.index.nlevels == 1 and index_df.index.name in df.index.names:
+                # match only on date level
+                df = df[df.index.get_level_values(index_df.index.name).isin(index_df.index)]
+            else:
+                raise ValueError(f"Cannot subset {index_df.index.nlevels} to {df.index.nlevels} index levels")
+
         ### min_stocks = numeric_or_None(min_stocks)
         if is_numeric_dtype(min_stocks) and self.nlevels == 2:
             counts = df.groupby(level=0).size()

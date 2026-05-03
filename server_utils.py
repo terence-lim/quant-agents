@@ -226,7 +226,7 @@ print(p3.to_json())  # returns saved name of the panel as JSON string
 # Please run this following code:
 from qrafti import Panel, MEDIA
 import matplotlib.pyplot as plt
-ret = 'ret_vw_cap'
+ret = 'vw_cap'
 factor = 'ret_12_1'
 bench = Panel().load(factor + '_' + ret).frame
 bench.cumsum().plot()

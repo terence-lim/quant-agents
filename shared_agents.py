@@ -7,16 +7,16 @@ from pydantic_ai.models.google import GoogleModel, GoogleModelSettings
 
 load_dotenv()
 
+model_name = os.getenv("MODEL_NAME", "")
 
 def create_model():
-    model_name = os.getenv("MODEL_NAME", "")
     model = GoogleModel(model_name)
     model_parameters = GoogleModelSettings(google_thinking_config={"include_thoughts": False})
-    return model_name, model, model_parameters
+    return model, model_parameters
 
 
 def create_agents():
-    _, model, model_parameters = create_model()
+    model, model_parameters = create_model()
 
     research_server = MCPServerStreamableHTTP(url="http://localhost:8000/mcp", read_timeout=900)
     report_server = MCPServerStreamableHTTP(url="http://localhost:8001/mcp", read_timeout=900)
@@ -97,8 +97,8 @@ Decision policy:
 4. Always execute through execute_python; never simulate execution.
 
 Panel coding conventions for synthesized code:
-* Prefer `from qrafti import Panel, DATES, plt_savefig` when relevant.
-* Load existing panels with `Panel().load(panel_id, **DATES)`.
+* Prefer `from qrafti import Panel, plt_savefig` when relevant.
+* Load existing panels with `Panel().load(panel_id)`.
 * Use Panel methods (`apply`, `trend`, `restrict`, operators) for panel operations; use `.frame` for pandas/lib usage.
 * If plotting, use `plt_savefig()` to save the figure and include the image filename in output JSON.
 * At the end of data-panel scripts, always persist and print `as_payload()` in JSON form.
@@ -113,12 +113,12 @@ Minimal Panel cheatsheet:
 Three reference examples to adapt when synthesizing code:
 1) `.frame` + matplotlib plotting
 ```python
-from qrafti import Panel, DATES, plt_savefig
+from qrafti import Panel, plt_savefig
 import matplotlib.pyplot as plt
 import json
 
 panel_id = "HML"
-returns_panel = Panel().load(panel_id, **DATES)
+returns_panel = Panel().load(panel_id)
 returns_df = returns_panel.frame
 
 plt.plot(returns_df.index, returns_df.cumsum().values)
@@ -133,7 +133,7 @@ print(json.dumps(out_dict))
 
 2) Cross-sectional `apply()` winsorization by date
 ```python
-from qrafti import Panel, DATES
+from qrafti import Panel
 import pandas as pd
 import json
 
@@ -144,15 +144,15 @@ def winsorize_helper(x, lower=0.05, upper=0.95):
         lo, hi = x.iloc[:, 0].quantile([lower, upper]).values
     return x.iloc[:, 0].clip(lower=lo, upper=hi)
 
-data_panel = Panel().load("RET", **DATES)
-indicator_panel = (Panel().load("EXCHCD", **DATES) == 1)
+data_panel = Panel().load("mthret")
+indicator_panel = (Panel().load("exchcd") == 1)
 result_panel = data_panel.apply(winsorize_helper, indicator_panel, how="left", fill_value=0)
 print(json.dumps(result_panel.as_payload()))
 ```
 
 3) Time-series rolling metric with `trend()`
 ```python
-from qrafti import Panel, DATES
+from qrafti import Panel
 import pandas as pd
 import json
 
@@ -160,7 +160,7 @@ def rolling_helper(df: pd.DataFrame) -> pd.Series:
     window, skip = 12, 1
     return df.shift(periods=skip).rolling(window=window - skip).sum().where(df.notna())
 
-log_returns = Panel().load("RET", **DATES).log1p()
+log_returns = Panel().load("mthret").log1p()
 result_panel = log_returns.trend(rolling_helper)
 print(json.dumps(result_panel.as_payload()))
 ```

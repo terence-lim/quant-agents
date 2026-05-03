@@ -2,6 +2,7 @@
 from qrafti import DATES, Panel
 from research_utils import (characteristics_coalesce, characteristics_resample, digitize,
                             portfolio_weights, portfolio_returns)
+import matplotlib.pyplot as plt
 from pathlib import Path
 
 code_prompt = """
@@ -22,19 +23,19 @@ where preferred stock is defined as the redemption (pstkrv), liquidation (pstkl)
 or par value (pstk), if available, in that order.
 
 Each December, divide book equity of a firm’s fiscal year-end at or before December 
-by the company market capitalization (CAPCO) at the end of the year. 
+by the company market capitalization (capco) at the end of the year. 
 Then construct book-to-market equity in June as the lagged values from the previous December.
 """
 
 q2a = code_prompt + q2
 
-q3 = q2 + """Sort stocks independently on market equity (CAP) into small and big stocks using 
+q3 = q2 + """Sort stocks independently on market equity (mthcap) into small and big stocks using 
 the median market capitalization of all stocks traded on the NYSE as breakpoints, 
 and on book-to-market equity into growth, neutral, and value stocks using the 30th and 70th 
 percentiles of book-to-market equity of all stocks traded on the NYSE as breakpoints.
 
 Form portfolios as the intersection of these sorts, 
-where the portfolios are weighted by market equity (CAP).
+where the portfolios are weighted by market equity (mthcap).
 
 Construct the HML factor portfolio as the average of a small and a big value portfolio minus 
 the average of a small and a big growth portfolio in each month. 
@@ -114,10 +115,9 @@ for panel, prompt in zip(out_panels, [q1, q1a, q2, q2a, q3, q3a, q3b]):
     print("python evaluate_agent.py " + query_name)    
 
 
-raise Exception
+#raise Exception
 
 dates = DATES
-years = Panel().load('YEARS', **dates)
 bench_id = 'HML'
 panel_counter = 0
 
@@ -128,30 +128,31 @@ pstk = Panel().load("pstk", **dates)
 seq = Panel().load("seq", **dates)  # total shareholders' equity
 preferred_stock = characteristics_coalesce(pstkrv, pstkl, pstk)
 #txditc = Panel().load("txditc", **dates).restrict(end_date="1993-12-31")
-book_value = (seq - preferred_stock).save(next(panels) + '_')
+book_value = (seq - preferred_stock)
+book_value.save(next(panels) + '_')
 book_value.save(next(panels) + '_')
 
 # Compute Book to Market at December samples
 month = 12  # Decembers
 book_samples = characteristics_resample(book_value, ffill=True, month=[month])
-company_value = Panel().load("CAPCO", **dates)
+company_value = Panel().load("capco", **dates)
 company_value = characteristics_resample(company_value, ffill=True, month=[month])
     
 # Lag Book to Market, restrict to universe and form terciles based on NYSE stocks
 lags = 6
-book_market = (book_samples / company_value).shift(lags).save(next(panels) + '_')
+book_market = (book_samples / company_value).shift(lags)
+book_market.save(next(panels) + '_')
 book_market.save(next(panels) + '_')
 
 
-"""
 # Form size and bm quantiles based on NYSE stocks
-nyse = Panel().load("EXCHCD", **dates) == 1
+nyse = Panel().load("exchcd", **dates) == 1
 book_quantiles = book_market.apply(digitize, reference=nyse, cuts=[0.3, 0.7])
-size_quantiles = Panel().load("CAP", **dates)
+size_quantiles = Panel().load("mthcap", **dates)
 size_quantiles = size_quantiles.apply(digitize, nyse, cuts=2)
 
 # Form intersection
-market_value = Panel().load("CAP", **dates)
+market_value = Panel().load("mthcap", **dates)
 BL1 = market_value.apply(portfolio_weights, reference=(size_quantiles == 2) & (book_quantiles == 1))
 BH1 = market_value.apply(portfolio_weights, reference=(size_quantiles == 2) & (book_quantiles == 3))
 SL1 = market_value.apply(portfolio_weights, reference=(size_quantiles == 1) & (book_quantiles == 1))
@@ -162,9 +163,12 @@ BH = portfolio_returns(BH1)
 SL = portfolio_returns(SL1)
 SH = portfolio_returns(SH1)
 
-composite_returns = ((SH - SL + BH - BL) / 2).save(next(panels) + '_')
-composite_returns.save(next(panels) + '_')
+composite_returns = ((SH - SL + BH - BL) / 2)
+#.save(next(panels) + '_')
+#composite_returns.save(next(panels) + '_')
 
+hml = Panel().load("HML")
+composite_returns.plot(hml, kind='scatter')
 # print(out_panels)
 
 """
@@ -173,4 +177,4 @@ hml = Panel().load("HML")
 hml.save(next(panels) + '_')
 hml.save(next(panels) + '_')
 hml.save(next(panels) + '_')
-
+"""

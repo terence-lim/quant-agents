@@ -12,7 +12,7 @@ from client_utils import (load_objects, generate_dot, restart, store_conversatio
                           load_recent_code_logs, SUBGRAPH_PNG)
 from report_utils import glossary_md
 from utils import MEDIA
-from shared_agents import create_agents, create_model
+from shared_agents import create_agents, create_model, model_name
 from agent_delegation import attach_research_delegation_tools
 import logging
 
@@ -106,8 +106,6 @@ def build_conversation_context(
     return "\n".join(lines)
 
 
-
-model_name, _, _ = create_model()
 api_key = os.getenv("GEMINI_API_KEY", "")
 agent_bundle = create_agents()
 research_agent = agent_bundle["research_agent"]

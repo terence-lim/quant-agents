@@ -2,6 +2,7 @@
 from qrafti import DATES, Panel
 from research_utils import rolling, digitize, winsorize, portfolio_weights, portfolio_returns
 import pandas as pd
+import matplotlib.pyplot as plt
 from pathlib import Path
 
 code_prompt = """
@@ -103,31 +104,31 @@ for panel, prompt in zip(out_panels, [q1, q1a, q2, q2a, q3, q3a, q3b]):
     print("python agent_cli.py " + query_name)
     print("python evaluate_agent.py " + query_name)    
 
-raise Exception
+#raise Exception
 
 # Compute 12-month-skip-1 momentum    
 dates = DATES
 window, skip = 12, 1
-log1p_ret = Panel().load('RET', **dates).log1p()
+log1p_ret = Panel().load('mthret', **dates).log1p()
 factor_pf = log1p_ret.trend(rolling, window=window, skip=skip, agg="sum", interval=1).expm1()
 factor_pf.save(next(panels) + '_')
 factor_pf.save(next(panels) + '_')
 
 # Compute terciles
-nyse_pf = Panel().load("EXCHCD", **dates).apply(pd.DataFrame.isin, values=[1])
-size_pf = Panel().load("CAP", **dates)
+nyse_pf = Panel().load("exchcd", **dates).apply(pd.DataFrame.isin, values=[1])
+size_pf = Panel().load("mthcap", **dates)
 decile_pf = size_pf.apply(digitize, nyse_pf, cuts=10)
 quintile_pf = size_pf.apply(digitize, nyse_pf, cuts=5)
 terciles_pf = factor_pf.apply(digitize, reference=decile_pf > 2, cuts=3)
 terciles_pf.save(next(panels) + '_')
 terciles_pf.save(next(panels) + '_')
 
-mom = Panel().load("ret_12_1_ret_vw_cap")
-mom.save(next(panels) + '_')
-mom.save(next(panels) + '_')
-mom.save(next(panels) + '_')
+mom = Panel().load("ret_12_1_vw_cap")
+#mom.save(next(panels) + '_')
+#mom.save(next(panels) + '_')
+#mom.save(next(panels) + '_')
 
-"""
+
 # Compute long-short spread returns
 vwcap_pf = size_pf.apply(winsorize, nyse_pf, lower=0, upper=0.80)
 long_pf = vwcap_pf.apply(portfolio_weights, reference=terciles_pf == 3)
@@ -137,6 +138,7 @@ long_ret = portfolio_returns(long_pf)
 short_ret = portfolio_returns(short_pf)
 spreads_pf = long_pf - short_pf
 composite_returns = long_ret - short_ret
-composite_returns.save(next(panels) + '_')
-composite_returns.save(next(panels) + '_')
-"""
+#composite_returns.save(next(panels) + '_')
+#composite_returns.save(next(panels) + '_')
+
+composite_returns.plot(mom, kind='scatter')

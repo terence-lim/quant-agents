@@ -10,16 +10,20 @@ from weasyprint import HTML
 from pathlib import Path
 from typing import List, Dict
 
+DATA = Path("data")
 OUTPUT = Path("output")
-LINKS = Path("LINKS")
 
-MEDIA = LINKS / "media"
-WORKSPACE = LINKS / "workspace"
+MEDIA = DATA / "media"
+WORKSPACE = DATA / "workspace"
+RAG_PATH = DATA / "rag"
 
 BENCHMARKS_RAG = "benchmark_returns"
 CHARACTERISTICS_RAG = "stock_characteristics"
-JKP_RAG_PATH = LINKS / "JKP_RAG"
-CRSP_RAG_PATH = LINKS / "CRSP_RAG"
+REFERENCE_PANEL = "total_count"  # 'Mkt-RF' 'ret_exc_lead1m'
+
+DATES = dict(start_date="2020-01-01", end_date="2025-12-31")  # should be in utils.py
+#DATES = dict(start_date="2001-01-01", end_date="2025-12-31")
+#DATES = dict(start_date="1993-01-01", end_date="2025-12-31")
 
 #
 # Helper utilities
@@ -82,11 +86,11 @@ def markdown_to_pdf(
 class Calendar:
     def __init__(
         self,
-        start_date: str = None, #DATES["start_date"],
-        end_date: str = None, #DATES["end_date"],
-        reference_panel: str = "TOTAL_COUNT"  # 'Mkt-RF' 'ret_exc_lead1m'
+        start_date: str = DATES["start_date"],
+        end_date: str = DATES["end_date"],
+        reference_panel: str = REFERENCE_PANEL
     ):
-        # Initialize the Calendar with unique sorted dates from a reference Panel 'ret_exc_lead1m'
+        # Initialize the Calendar with unique sorted dates from a reference Panel
         dates = DataCache.read_frame(reference_panel).index.get_level_values(0)
         if start_date:
             dates = dates[dates >= start_date]

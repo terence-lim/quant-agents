@@ -4,7 +4,7 @@ from mcp.server.fastmcp import FastMCP
 from utils import MEDIA, markdown_to_pdf
 import traceback
 import json
-from qrafti import Panel, DATES
+from qrafti import Panel
 from report_utils import write_report
 from server_utils import panel_or_numeric, str_or_None, bool_or_None, int_or_None, log_tool, now
 import logging
@@ -69,7 +69,7 @@ The tables section reproduces the statistical tables data provided below.
 Base the Results section strictly on the statistical tables data, matching its terminology and precision:
 """
     try:
-        panel = panel_or_numeric(panel_id, **DATES)
+        panel = panel_or_numeric(panel_id)
         report_tables = write_report(panel)
         report_prompt = "\n\n".join([prompt_str.strip(), report_tables.strip(), f"Report Created: {now()}"])
 

@@ -6,6 +6,7 @@ import faiss
 import chromadb
 from sentence_transformers import SentenceTransformer
 from pathlib import Path
+from dotenv import load_dotenv
 import logging
 logging.basicConfig(level=logging.WARNING)
 # logging.disable(logging.CRITICAL) # DEBUG, INFO, WARNING, ERROR, CRITICAL
@@ -35,6 +36,7 @@ class RAG:
         Path(self.chroma_dir).parent.mkdir(parents=True, exist_ok=True)
 
         # Initialize components
+        load_dotenv()
         self.model = SentenceTransformer(model_name)
         self.client = chromadb.PersistentClient(path=self.chroma_dir)
 
